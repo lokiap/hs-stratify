@@ -1,0 +1,37 @@
+# Cohortes GEO de biopsies de peau (maladie de Verneuil / hidradenitis suppurativa).
+# Liste reprise de l'étude de référence : bioRxiv 10.1101/2025.02.03.636243.
+#
+# role :
+#   discovery  -> cohortes servant à construire les sous-types et entraîner les modèles
+#   validation -> cohortes jamais vues pendant l'entraînement
+# response_labels :
+#   unknown -> à vérifier dans les métadonnées GEO (réponse à l'adalimumab disponible ?)
+
+cohorts:
+  - id: GSE151243
+    role: discovery
+    response_labels: unknown
+  - id: GSE154773
+    role: discovery
+    response_labels: unknown
+  - id: GSE155176
+    role: discovery
+    response_labels: unknown
+  - id: GSE189266
+    role: discovery
+    response_labels: unknown
+  - id: GSE213761
+    role: discovery
+    response_labels: unknown
+  - id: GSE249027
+    role: discovery
+    response_labels: unknown
+  - id: GSE72702
+    role: validation
+    response_labels: unknown
+  - id: GSE148027
+    role: validation
+    response_labels: unknown
+  - id: GSE128637
+    role: validation
+    response_labels: unknown
