@@ -11,6 +11,7 @@ def test_default_config_loads():
     assert {c.platform for c in cohorts} == {"rnaseq", "array"}
     labelled = [c.id for c in cohorts if c.response_labels != "none"]
     assert labelled == ["GSE155176", "GSE213761"]
+    assert next(c for c in cohorts if c.id == "GSE155176").labels is not None
 
 
 def test_rejects_unknown_role(tmp_path):

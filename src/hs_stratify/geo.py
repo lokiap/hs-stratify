@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import gzip
 import io
+import re
 import shutil
+import time
 import urllib.request
 from pathlib import Path
 
@@ -47,17 +49,45 @@ def ncbi_annot_url() -> str:
     return f"{GEO_DOWNLOAD}?format=file&type=rnaseq_counts&file={HUMAN_ANNOT}"
 
 
-def download(url: str, dest: Path) -> Path:
-    """Télécharge `url` vers `dest`, sauf si le fichier est déjà en cache."""
+def _check_gzip(path: Path) -> None:
+    """NCBI renvoie parfois une page HTML (erreur, limite de requêtes) au lieu du fichier."""
+    with open(path, "rb") as f:
+        head = f.read(2048)
+    if head[:2] == b"\x1f\x8b":
+        return
+    title = re.search(rb"<title>(.*?)</title>", head, re.IGNORECASE | re.DOTALL)
+    detail = title.group(1).decode(errors="replace").strip() if title else head[:80]
+    raise ValueError(f"réponse inattendue au lieu d'un fichier gzip : {detail!r}")
+
+
+def download(url: str, dest: Path, retries: int = 3) -> Path:
+    """Télécharge `url` vers `dest`, sauf si un fichier valide est déjà en cache."""
+    must_be_gzip = dest.name.endswith(".gz")
     if dest.exists() and dest.stat().st_size > 0:
-        return dest
+        try:
+            if must_be_gzip:
+                _check_gzip(dest)
+            return dest
+        except ValueError:
+            dest.unlink()  # fichier corrompu laissé par une exécution précédente
+
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     request = urllib.request.Request(url, headers={"User-Agent": "hs-stratify"})
-    with urllib.request.urlopen(request, timeout=120) as response, open(tmp, "wb") as out:
-        shutil.copyfileobj(response, out)
-    tmp.replace(dest)
-    return dest
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response, open(tmp, "wb") as out:
+                shutil.copyfileobj(response, out)
+            if must_be_gzip:
+                _check_gzip(tmp)
+            tmp.replace(dest)
+            return dest
+        except (OSError, ValueError) as exc:
+            tmp.unlink(missing_ok=True)
+            if attempt == retries:
+                raise RuntimeError(f"Échec du téléchargement de {url} : {exc}") from exc
+            time.sleep(2**attempt)  # NCBI limite le nombre de requêtes par seconde
+    raise AssertionError("inatteignable")
 
 
 def _open_text(path: Path):

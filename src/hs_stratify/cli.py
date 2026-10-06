@@ -7,6 +7,7 @@ from pathlib import Path
 
 from hs_stratify.cohorts import load_cohorts
 from hs_stratify.data import fetch_metadata, load_cohort
+from hs_stratify.labels import cohort_labels
 
 PROCESSED_DIR = Path("data/processed")
 
@@ -47,6 +48,11 @@ def main(argv: list[str] | None = None) -> None:
             expression.to_csv(PROCESSED_DIR / f"{cohort.id}_expression.csv.gz")
             meta.to_csv(PROCESSED_DIR / f"{cohort.id}_metadata.csv.gz")
             print(f"  {expression.shape[0]} échantillons x {expression.shape[1]} gènes")
+            if cohort.labels:
+                labels = cohort_labels(meta, cohort.labels)
+                labels.to_csv(PROCESSED_DIR / f"{cohort.id}_labels.csv")
+                n_pos = int(labels.sum())
+                print(f"  réponse : {n_pos} répondeurs, {len(labels) - n_pos} non-répondeurs")
 
 
 if __name__ == "__main__":

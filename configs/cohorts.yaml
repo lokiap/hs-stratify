@@ -9,9 +9,14 @@
 #   rnaseq -> comptages recalculés par NCBI (GRCh38)
 #   array  -> valeurs du series matrix, annotées via la plateforme GPL
 # response_labels :
-#   adalimumab_hiscr -> réponse à l'adalimumab (critère HiSCR) d'après l'étude de référence,
-#                       champ exact à confirmer avec `hs-stratify inspect <GSE>`
-#   none             -> pas d'étiquette de réponse
+#   anti_tnf -> réponse à un anti-TNF (adalimumab d'après l'étude de référence)
+#   none     -> pas d'étiquette de réponse
+# labels (facultatif) : comment lire la réponse dans les métadonnées GEO.
+#   filters  -> on ne garde que les échantillons dont les champs prennent ces valeurs
+#   hiscr    -> à la place de response : HiSCR recalculé à partir des comptes de lésions
+#   response -> champ de réponse, valeurs comptées comme répondeur (positive) ou non (negative) ;
+#               toute autre valeur (NA, Partial, Unknown...) est écartée.
+#   Les comparaisons ignorent la casse. Champs visibles avec `hs-stratify inspect <GSE>`.
 
 cohorts:
   - id: GSE151243
@@ -23,14 +28,38 @@ cohorts:
   - id: GSE155176
     role: discovery
     platform: rnaseq
-    response_labels: adalimumab_hiscr
+    response_labels: anti_tnf
+    labels:
+      # Biopsies de lésion prélevées avant le début de l'anti-TNF.
+      filters:
+        "ch1:tissue type": [Lesional]
+        "ch1:treatment category": [PRE-TNF-alpha inhibitor]
+      response:
+        field: "ch1:response"
+        positive: ["yes"]
+        negative: ["no"]
   - id: GSE189266
     role: discovery
     platform: rnaseq
   - id: GSE213761
     role: discovery
     platform: rnaseq
-    response_labels: adalimumab_hiscr
+    response_labels: anti_tnf
+    labels:
+      # Pas de colonne de réponse : HiSCR recalculé à partir des comptes de lésions
+      # entre la visite initiale (V1) et la visite V12, sous adalimumab.
+      filters:
+        "ch1:site": [LS]
+        "ch1:visit": [V1]
+      hiscr:
+        subject: "ch1:subject"
+        visit: "ch1:visit"
+        baseline: V1
+        followup: V12
+        abscess: "ch1:abcess count"
+        nodule: "ch1:node count"
+        fistula: "ch1:fistula count"
+        min_baseline_an: 3
   - id: GSE249027
     role: discovery
     platform: rnaseq

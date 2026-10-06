@@ -1,6 +1,8 @@
 import gzip
+import io
 
 import pandas as pd
+import pytest
 
 from hs_stratify import geo
 
@@ -67,3 +69,26 @@ def test_read_ncbi_counts_sums_by_symbol(tmp_path):
 
     assert sorted(result.index) == ["IL17A", "TNF"]
     assert result.loc["TNF", "GSM2"] == 20
+
+
+def test_download_replaces_cached_html_and_reports_error(tmp_path, monkeypatch):
+    dest = tmp_path / "annot.tsv.gz"
+    dest.write_text("<!DOCTYPE html><html><title>Error</title></html>")
+
+    def fake_urlopen(request, timeout):
+        return io.BytesIO(b"<!DOCTYPE html><html><title>Too Many Requests</title></html>")
+
+    monkeypatch.setattr(geo.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(geo.time, "sleep", lambda s: None)
+
+    with pytest.raises(RuntimeError, match="Too Many Requests"):
+        geo.download("https://example.org/annot", dest)
+    assert not dest.exists()
+
+
+def test_download_keeps_valid_cache(tmp_path, monkeypatch):
+    dest = tmp_path / "ok.tsv.gz"
+    with gzip.open(dest, "wt") as f:
+        f.write("GeneID\tSymbol\n")
+    monkeypatch.setattr(geo.urllib.request, "urlopen", lambda *a, **k: 1 / 0)
+    assert geo.download("https://example.org/ok", dest) == dest

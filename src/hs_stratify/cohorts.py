@@ -18,6 +18,8 @@ class Cohort:
     role: str
     platform: str
     response_labels: str = "none"
+    # Règles pour extraire la réponse au traitement des métadonnées (voir labels.py).
+    labels: dict | None = None
 
 
 def load_cohorts(path: Path | str = DEFAULT_CONFIG) -> list[Cohort]:
@@ -33,6 +35,8 @@ def load_cohorts(path: Path | str = DEFAULT_CONFIG) -> list[Cohort]:
             raise ValueError(f"Rôle inconnu pour {cohort.id} : {cohort.role}")
         if cohort.platform not in PLATFORMS:
             raise ValueError(f"Plateforme inconnue pour {cohort.id} : {cohort.platform}")
+        if cohort.labels is not None and cohort.response_labels == "none":
+            raise ValueError(f"{cohort.id} : règles d'étiquetage sans response_labels")
 
     ids = [c.id for c in cohorts]
     if len(ids) != len(set(ids)):
