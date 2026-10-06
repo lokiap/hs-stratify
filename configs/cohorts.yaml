@@ -1,37 +1,45 @@
 # Cohortes GEO de biopsies de peau (maladie de Verneuil / hidradenitis suppurativa).
-# Liste reprise de l'étude de référence : bioRxiv 10.1101/2025.02.03.636243.
+# Liste, plateformes et étiquettes de réponse reprises de l'étude de référence :
+# bioRxiv 10.1101/2025.02.03.636243.
 #
 # role :
 #   discovery  -> cohortes servant à construire les sous-types et entraîner les modèles
 #   validation -> cohortes jamais vues pendant l'entraînement
+# platform :
+#   rnaseq -> comptages recalculés par NCBI (GRCh38)
+#   array  -> valeurs du series matrix, annotées via la plateforme GPL
 # response_labels :
-#   unknown -> à vérifier dans les métadonnées GEO (réponse à l'adalimumab disponible ?)
+#   adalimumab_hiscr -> réponse à l'adalimumab (critère HiSCR) d'après l'étude de référence,
+#                       champ exact à confirmer avec `hs-stratify inspect <GSE>`
+#   none             -> pas d'étiquette de réponse
 
 cohorts:
   - id: GSE151243
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
   - id: GSE154773
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
   - id: GSE155176
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    response_labels: adalimumab_hiscr
   - id: GSE189266
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
   - id: GSE213761
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    response_labels: adalimumab_hiscr
   - id: GSE249027
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
   - id: GSE72702
     role: validation
-    response_labels: unknown
+    platform: array
   - id: GSE148027
     role: validation
-    response_labels: unknown
+    platform: array
   - id: GSE128637
     role: validation
-    response_labels: unknown
+    platform: array

@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. The repository structure, cohort registry and evaluation protocol are in place; data loading and models are not yet implemented.
+> **Status:** work in progress. Cohort registry, GEO data loading and the evaluation protocol are in place; models and results are not there yet.
 
 ## English
 
@@ -14,7 +14,11 @@ Hidradenitis suppurativa (HS, also called Verneuil's disease) is a chronic infla
 
 ### Data
 
-Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](configs/cohorts.yaml). The list follows the reference study [*Classification of skin transcriptome reveals two molecular subtypes in hidradenitis suppurativa* (bioRxiv, 2025)](https://www.biorxiv.org/content/10.1101/2025.02.03.636243): 6 discovery cohorts (100 lesional samples) and 3 validation cohorts. Which cohorts carry treatment-response labels is still to be checked.
+Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](configs/cohorts.yaml). The list follows the reference study [*Classification of skin transcriptome reveals two molecular subtypes in hidradenitis suppurativa* (bioRxiv, 2025)](https://www.biorxiv.org/content/10.1101/2025.02.03.636243): 6 discovery cohorts (RNA-seq, 100 lesional samples) and 3 validation cohorts (microarrays). According to that study, two cohorts (GSE155176 and GSE213761) carry adalimumab response labels (HiSCR).
+
+- **RNA-seq:** raw counts recomputed by NCBI on GRCh38, the same pipeline for every study, then log2(CPM + 1) with the reference study's filter (CPM ≥ 1 in ≥ 20% of samples).
+- **Microarrays:** values from the GEO series matrix, probes mapped to genes with the GPL annotation and averaged per gene.
+- **Sample metadata** (tissue, response, timepoint) comes from the series matrix of each cohort.
 
 ### Evaluation protocol
 
@@ -29,7 +33,8 @@ Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](config
 configs/cohorts.yaml     GEO cohorts and their role
 src/hs_stratify/
   cohorts.py             cohort registry
-  data.py                GEO download (GEOparse)
+  geo.py                 GEO URLs and file parsers
+  data.py                builds one cohort's expression matrix
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
   models.py              baseline model
@@ -42,10 +47,11 @@ notebooks/               exploration
 ### Getting started
 
 ```bash
-pip install -e ".[dev,data]"
+pip install -e ".[dev]"
 pytest
 hs-stratify cohorts          # list configured cohorts
-hs-stratify download         # download all cohorts from GEO into data/raw
+hs-stratify inspect GSE155176  # show a cohort's metadata fields
+hs-stratify build            # download from GEO and write data/processed/
 ```
 
 ## Français
@@ -56,7 +62,11 @@ La maladie de Verneuil (hidradenitis suppurativa, HS) est une maladie inflammato
 
 ### Données
 
-Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.yaml`](configs/cohorts.yaml). La liste reprend l'étude de référence ([bioRxiv, 2025](https://www.biorxiv.org/content/10.1101/2025.02.03.636243)) : 6 cohortes de découverte (100 biopsies) et 3 cohortes de validation. Il reste à vérifier lesquelles contiennent la réponse au traitement.
+Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.yaml`](configs/cohorts.yaml). La liste reprend l'étude de référence ([bioRxiv, 2025](https://www.biorxiv.org/content/10.1101/2025.02.03.636243)) : 6 cohortes de découverte (RNA-seq, 100 biopsies) et 3 cohortes de validation (puces). D'après cette étude, deux cohortes (GSE155176 et GSE213761) contiennent la réponse à l'adalimumab (critère HiSCR).
+
+- **RNA-seq :** comptages recalculés par NCBI sur GRCh38, le même traitement pour toutes les études, puis log2(CPM + 1) avec le filtre de l'étude de référence (CPM ≥ 1 dans au moins 20 % des échantillons).
+- **Puces :** valeurs du series matrix GEO, sondes rattachées aux gènes via l'annotation GPL et moyennées par gène.
+- **Métadonnées des échantillons** (tissu, réponse, temps) : lues dans le series matrix de chaque cohorte.
 
 ### Protocole d'évaluation
 
@@ -68,10 +78,11 @@ Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.
 ### Démarrer
 
 ```bash
-pip install -e ".[dev,data]"
+pip install -e ".[dev]"
 pytest
 hs-stratify cohorts          # lister les cohortes configurées
-hs-stratify download         # télécharger les cohortes depuis GEO dans data/raw
+hs-stratify inspect GSE155176  # afficher les champs de métadonnées d'une cohorte
+hs-stratify build            # télécharger depuis GEO et écrire data/processed/
 ```
 
 ## License

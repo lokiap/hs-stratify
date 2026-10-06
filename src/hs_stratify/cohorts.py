@@ -9,13 +9,15 @@ import yaml
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "cohorts.yaml"
 ROLES = {"discovery", "validation"}
+PLATFORMS = {"rnaseq", "array"}
 
 
 @dataclass(frozen=True)
 class Cohort:
     id: str
     role: str
-    response_labels: str = "unknown"
+    platform: str
+    response_labels: str = "none"
 
 
 def load_cohorts(path: Path | str = DEFAULT_CONFIG) -> list[Cohort]:
@@ -29,6 +31,8 @@ def load_cohorts(path: Path | str = DEFAULT_CONFIG) -> list[Cohort]:
             raise ValueError(f"Identifiant GEO invalide : {cohort.id}")
         if cohort.role not in ROLES:
             raise ValueError(f"Rôle inconnu pour {cohort.id} : {cohort.role}")
+        if cohort.platform not in PLATFORMS:
+            raise ValueError(f"Plateforme inconnue pour {cohort.id} : {cohort.platform}")
 
     ids = [c.id for c in cohorts]
     if len(ids) != len(set(ids)):

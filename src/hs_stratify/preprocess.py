@@ -2,7 +2,32 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+
+
+def log_cpm(counts: pd.DataFrame, min_cpm: float = 1.0, min_fraction: float = 0.2) -> pd.DataFrame:
+    """Comptages bruts (gènes x échantillons) -> log2(CPM + 1).
+
+    Garde les gènes avec un CPM >= `min_cpm` dans au moins `min_fraction` des échantillons,
+    le même filtre que l'étude de référence.
+    """
+    cpm = counts / counts.sum(axis=0) * 1e6
+    keep = (cpm >= min_cpm).mean(axis=1) >= min_fraction
+    return np.log2(cpm[keep] + 1)
+
+
+def ensure_log2(values: pd.DataFrame) -> pd.DataFrame:
+    """Passe des intensités de puce en log2 si elles ne le sont pas déjà."""
+    if values.max().max() > 100:
+        return np.log2(values.clip(lower=0) + 1)
+    return values
+
+
+def probes_to_genes(values: pd.DataFrame, probe_to_symbol: pd.Series) -> pd.DataFrame:
+    """Sondes x échantillons -> gènes x échantillons, en moyennant les sondes d'un même gène."""
+    mapped = values.join(probe_to_symbol.rename("symbol"), how="inner")
+    return mapped.groupby("symbol").mean()
 
 
 def common_genes(matrices: dict[str, pd.DataFrame]) -> list[str]:
