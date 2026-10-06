@@ -22,7 +22,9 @@ import pandas as pd
 
 GEO_FTP = "https://ftp.ncbi.nlm.nih.gov/geo"
 GEO_DOWNLOAD = "https://www.ncbi.nlm.nih.gov/geo/download/"
-HUMAN_ANNOT = "Human.GRCh38.p13.annot.tsv.gz"
+# Correspondance GeneID -> symbole. Prise sur le FTP : la page de téléchargement GEO du site
+# web peut renvoyer un reCAPTCHA aux scripts.
+HUMAN_ANNOT = "Homo_sapiens.gene_info.gz"
 
 
 def _stub(accession: str) -> str:
@@ -40,13 +42,17 @@ def platform_annot_url(gpl_id: str) -> str:
     return f"{GEO_FTP}/platforms/{_stub(gpl_id)}/{gpl_id}/annot/{gpl_id}.annot.gz"
 
 
-def ncbi_counts_url(gse_id: str) -> str:
+def ncbi_counts_urls(gse_id: str) -> list[str]:
+    """Adresses des comptages NCBI, le FTP d'abord puis la page de téléchargement GEO."""
     file = f"{gse_id}_raw_counts_GRCh38.p13_NCBI.tsv.gz"
-    return f"{GEO_DOWNLOAD}?type=rnaseq_counts&acc={gse_id}&format=file&file={file}"
+    return [
+        f"{GEO_FTP}/series/{_stub(gse_id)}/{gse_id}/suppl/{file}",
+        f"{GEO_DOWNLOAD}?type=rnaseq_counts&acc={gse_id}&format=file&file={file}",
+    ]
 
 
 def ncbi_annot_url() -> str:
-    return f"{GEO_DOWNLOAD}?format=file&type=rnaseq_counts&file={HUMAN_ANNOT}"
+    return f"https://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/{HUMAN_ANNOT}"
 
 
 def _check_gzip(path: Path) -> None:
@@ -55,9 +61,24 @@ def _check_gzip(path: Path) -> None:
         head = f.read(2048)
     if head[:2] == b"\x1f\x8b":
         return
+    if b"recaptcha" in head.lower() or b"www.google" in head:
+        raise ValueError(
+            "NCBI a renvoyé une vérification anti-robot (reCAPTCHA), réessaie plus tard"
+        )
     title = re.search(rb"<title>(.*?)</title>", head, re.IGNORECASE | re.DOTALL)
     detail = title.group(1).decode(errors="replace").strip() if title else head[:80]
     raise ValueError(f"réponse inattendue au lieu d'un fichier gzip : {detail!r}")
+
+
+def download_first(urls: list[str], dest: Path) -> Path:
+    """Essaie chaque adresse jusqu'à ce que l'une fournisse un fichier valide."""
+    errors = []
+    for url in urls:
+        try:
+            return download(url, dest)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+    raise RuntimeError("Aucune source disponible :\n" + "\n".join(errors))
 
 
 def download(url: str, dest: Path, retries: int = 3) -> Path:
@@ -166,9 +187,25 @@ def read_platform_annot(path: Path) -> pd.Series:
     return symbols[~symbols.str.contains("///", regex=False)]
 
 
+def read_gene_info(path: Path) -> pd.Series:
+    """Lit la correspondance GeneID -> symbole.
+
+    Accepte le fichier `Homo_sapiens.gene_info.gz` du FTP NCBI, dont la première colonne
+    de l'en-tête s'appelle « #tax_id », comme un simple tableau GeneID / Symbol.
+    """
+    with _open_text(path) as f:
+        header = f.readline().lstrip("#").rstrip("\n").split("\t")
+        table = pd.read_csv(f, sep="\t", names=header, usecols=["GeneID", "Symbol"], dtype=str)
+    symbols = table.dropna().drop_duplicates("GeneID").set_index("GeneID")["Symbol"]
+    symbols.index = pd.to_numeric(symbols.index, errors="coerce")
+    return symbols[symbols.index.notna()]
+
+
 def read_ncbi_counts(counts_path: Path, annot_path: Path) -> pd.DataFrame:
     """Lit les comptages NCBI (GeneID x échantillons) et indexe par symbole de gène."""
     counts = pd.read_csv(counts_path, sep="\t", index_col=0)
-    annot = pd.read_csv(annot_path, sep="\t", index_col=0, usecols=["GeneID", "Symbol"])
-    counts = counts.join(annot, how="inner").dropna(subset=["Symbol"])
-    return counts.groupby("Symbol").sum()
+    counts.index = pd.to_numeric(counts.index, errors="coerce")
+    counts = counts[counts.index.notna()]
+    symbols = read_gene_info(annot_path).reindex(counts.index)
+    counts = counts[symbols.notna()]
+    return counts.groupby(symbols.dropna().to_numpy()).sum()

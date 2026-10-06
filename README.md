@@ -16,7 +16,7 @@ Hidradenitis suppurativa (HS, also called Verneuil's disease) is a chronic infla
 
 Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](configs/cohorts.yaml). The list follows the reference study [*Classification of skin transcriptome reveals two molecular subtypes in hidradenitis suppurativa* (bioRxiv, 2025)](https://www.biorxiv.org/content/10.1101/2025.02.03.636243): 6 discovery cohorts (RNA-seq, 100 lesional samples) and 3 validation cohorts (microarrays). Two cohorts carry treatment response: GSE155176 gives it directly (anti-TNF, baseline lesional biopsies), and for GSE213761 (adalimumab) it is recomputed as HiSCR from abscess, nodule and fistula counts between visits V1 and V12.
 
-- **RNA-seq:** raw counts recomputed by NCBI on GRCh38, the same pipeline for every study, then log2(CPM + 1) with the reference study's filter (CPM ≥ 1 in ≥ 20% of samples).
+- **RNA-seq:** raw counts recomputed by NCBI on GRCh38, the same pipeline for every study, fetched from the GEO FTP (the website's download page can answer a script with a reCAPTCHA), then log2(CPM + 1) with the reference study's filter (CPM ≥ 1 in ≥ 20% of samples).
 - **Microarrays:** values from the GEO series matrix, probes mapped to genes with the GPL annotation and averaged per gene.
 - **Sample metadata** (tissue, response, timepoint) comes from the series matrix of each cohort.
 
@@ -65,7 +65,7 @@ La maladie de Verneuil (hidradenitis suppurativa, HS) est une maladie inflammato
 
 Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.yaml`](configs/cohorts.yaml). La liste reprend l'étude de référence ([bioRxiv, 2025](https://www.biorxiv.org/content/10.1101/2025.02.03.636243)) : 6 cohortes de découverte (RNA-seq, 100 biopsies) et 3 cohortes de validation (puces). Deux cohortes contiennent la réponse au traitement : GSE155176 la donne directement (anti-TNF, biopsies de lésion avant traitement), et pour GSE213761 (adalimumab) elle est recalculée selon le critère HiSCR à partir des comptes d'abcès, de nodules et de fistules entre les visites V1 et V12.
 
-- **RNA-seq :** comptages recalculés par NCBI sur GRCh38, le même traitement pour toutes les études, puis log2(CPM + 1) avec le filtre de l'étude de référence (CPM ≥ 1 dans au moins 20 % des échantillons).
+- **RNA-seq :** comptages recalculés par NCBI sur GRCh38, le même traitement pour toutes les études, récupérés sur le FTP de GEO (la page de téléchargement du site web peut renvoyer un reCAPTCHA à un script), puis log2(CPM + 1) avec le filtre de l'étude de référence (CPM ≥ 1 dans au moins 20 % des échantillons).
 - **Puces :** valeurs du series matrix GEO, sondes rattachées aux gènes via l'annotation GPL et moyennées par gène.
 - **Métadonnées des échantillons** (tissu, réponse, temps) : lues dans le series matrix de chaque cohorte.
 

@@ -24,8 +24,8 @@ def load_cohort(cohort: Cohort, raw_dir: Path = RAW_DIR) -> tuple[pd.DataFrame, 
     meta, array_values, platforms = fetch_metadata(cohort.id, raw_dir)
 
     if cohort.platform == "rnaseq":
-        counts_path = geo.download(
-            geo.ncbi_counts_url(cohort.id), raw_dir / f"{cohort.id}_ncbi_counts.tsv.gz"
+        counts_path = geo.download_first(
+            geo.ncbi_counts_urls(cohort.id), raw_dir / f"{cohort.id}_ncbi_counts.tsv.gz"
         )
         annot_path = geo.download(geo.ncbi_annot_url(), raw_dir / geo.HUMAN_ANNOT)
         genes_x_samples = log_cpm(geo.read_ncbi_counts(counts_path, annot_path))

@@ -62,8 +62,14 @@ def test_read_platform_annot_drops_ambiguous_probes(tmp_path):
 def test_read_ncbi_counts_sums_by_symbol(tmp_path):
     counts = tmp_path / "counts.tsv"
     counts.write_text("GeneID\tGSM1\tGSM2\n7124\t10\t20\n3605\t1\t2\n9999\t5\t5\n")
+    # En-tête du fichier gene_info du FTP NCBI : la première colonne commence par « # ».
     annot = tmp_path / "annot.tsv"
-    annot.write_text("GeneID\tSymbol\tDescription\n7124\tTNF\tx\n3605\tIL17A\tx\n")
+    annot.write_text(
+        "#tax_id\tGeneID\tSymbol\tLocusTag\n"
+        "9606\t7124\tTNF\t-\n"
+        "9606\t3605\tIL17A\t-\n"
+        "9606\t1\tA1BG\t-\n"
+    )
 
     result = geo.read_ncbi_counts(counts, annot)
 
@@ -92,3 +98,39 @@ def test_download_keeps_valid_cache(tmp_path, monkeypatch):
         f.write("GeneID\tSymbol\n")
     monkeypatch.setattr(geo.urllib.request, "urlopen", lambda *a, **k: 1 / 0)
     assert geo.download("https://example.org/ok", dest) == dest
+
+
+def test_check_gzip_names_recaptcha(tmp_path):
+    path = tmp_path / "x.gz"
+    path.write_text('<!doctype html><html><head><base href="https://www.google.com/recaptcha/">')
+    with pytest.raises(ValueError, match="anti-robot"):
+        geo._check_gzip(path)
+
+
+def test_counts_urls_prefer_ftp():
+    first, second = geo.ncbi_counts_urls("GSE151243")
+    assert first == (
+        "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE151nnn/GSE151243/suppl/"
+        "GSE151243_raw_counts_GRCh38.p13_NCBI.tsv.gz"
+    )
+    assert second.startswith("https://www.ncbi.nlm.nih.gov/geo/download/")
+
+
+def test_download_first_falls_back(tmp_path, monkeypatch):
+    dest = tmp_path / "counts.tsv.gz"
+    calls = []
+
+    def fake_urlopen(request, timeout):
+        calls.append(request.full_url)
+        if request.full_url.startswith("https://a/"):
+            raise OSError("404")
+        buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
+            f.write(b"GeneID\tGSM1\n")
+        return io.BytesIO(buffer.getvalue())
+
+    monkeypatch.setattr(geo.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(geo.time, "sleep", lambda s: None)
+
+    assert geo.download_first(["https://a/x", "https://b/x"], dest) == dest
+    assert calls[-1] == "https://b/x"
