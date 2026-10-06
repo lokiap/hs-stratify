@@ -27,6 +27,18 @@ Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](config
 - **Baseline:** elastic-net logistic regression, compared later with richer models.
 - **Metric:** AUROC per held-out cohort, reported cohort by cohort, not only averaged.
 
+### First experiment: lesional vs non-lesional skin
+
+Before predicting treatment response (only 26 labelled patients across two cohorts), the project checks that a model can tell **lesional** skin from **non-lesional or healthy** skin in a cohort it has never seen, including across technologies (RNA-seq to microarrays). Tissue labels come from each cohort's metadata (rules in `configs/cohorts.yaml`), using pre-treatment biopsies only; perilesional skin is left out.
+
+Two normalisations are compared:
+- **per cohort:** each gene centred and scaled within its cohort. This removes study effects, but also the lesion signal of a cohort made almost only of lesions;
+- **per sample:** each sample centred and scaled over its own genes, independent of the other samples.
+
+```bash
+hs-stratify evaluate lesional   # AUROC per held-out cohort, written to results/lesional_loco.csv
+```
+
 ### Layout
 
 ```
@@ -35,7 +47,8 @@ src/hs_stratify/
   cohorts.py             cohort registry
   geo.py                 GEO URLs and file parsers
   data.py                builds one cohort's expression matrix
-  labels.py              treatment response labels (field or HiSCR)
+  labels.py              tissue and treatment response labels (field or HiSCR)
+  experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
   models.py              baseline model
@@ -75,6 +88,18 @@ Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.
 - **Standardisation par cohorte** d'abord, pour limiter les effets d'étude sans faire fuiter d'information d'une cohorte à l'autre.
 - **Baseline :** régression logistique elastic net, comparée ensuite à des modèles plus riches.
 - **Métrique :** AUROC par cohorte testée, rapportée cohorte par cohorte et pas seulement en moyenne.
+
+### Première expérience : peau lésionnelle ou non
+
+Avant de prédire la réponse au traitement (26 patients étiquetés seulement, sur deux cohortes), le projet vérifie qu'un modèle sait distinguer une peau **lésionnelle** d'une peau **non lésionnelle ou saine** dans une cohorte qu'il n'a jamais vue, y compris en changeant de technologie (du RNA-seq aux puces). Le type de tissu vient des métadonnées de chaque cohorte (règles dans `configs/cohorts.yaml`), sur les biopsies avant traitement uniquement ; la peau péri-lésionnelle est écartée.
+
+Deux normalisations sont comparées :
+- **par cohorte :** chaque gène est centré-réduit au sein de sa cohorte. Cela retire les effets d'étude, mais aussi le signal de lésion d'une cohorte composée presque uniquement de lésions ;
+- **par échantillon :** chaque échantillon est centré-réduit sur ses propres gènes, sans dépendre des autres échantillons.
+
+```bash
+hs-stratify evaluate lesional   # AUROC par cohorte laissée de côté, écrite dans results/lesional_loco.csv
+```
 
 ### Démarrer
 

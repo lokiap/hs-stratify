@@ -20,6 +20,8 @@ class Cohort:
     response_labels: str = "none"
     # Règles pour extraire la réponse au traitement des métadonnées (voir labels.py).
     labels: dict | None = None
+    # Règles pour lire le type de tissu (lésion, peau saine...) dans les métadonnées.
+    tissue: dict | None = None
 
 
 def load_cohorts(path: Path | str = DEFAULT_CONFIG) -> list[Cohort]:

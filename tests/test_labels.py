@@ -3,7 +3,7 @@ import pytest
 
 from hs_stratify.cohorts import load_cohorts
 from hs_stratify.labels import cohort_labels as response_labels_for
-from hs_stratify.labels import response_labels
+from hs_stratify.labels import response_labels, tissue_labels
 
 META = pd.DataFrame(
     {
@@ -63,3 +63,30 @@ def test_gse213761_hiscr_from_lesion_counts():
     assert dict(zip(by_subject, labels, strict=True)) == {"1": 1, "2": 0, "3": 0}
     assert set(meta.loc[labels.index, "ch1:site"]) == {"LS"}
     assert set(meta.loc[labels.index, "ch1:visit"]) == {"V1"}
+
+
+def test_tissue_rules_for_every_cohort_are_valid():
+    meta = pd.DataFrame({"title": ["lesional [GSM1]", "healthy [GSM2]", "non-lesional [GSM3]"]})
+    meta["ch1:patient"] = ["visit: HS16:V1", "visit: HV61:V1", "visit: HS16:V2"]
+    rules = next(c.tissue for c in load_cohorts() if c.id == "GSE148027")
+    assert tissue_labels(meta, rules).tolist() == ["lesional", "healthy"]
+
+    for cohort in load_cohorts():
+        assert cohort.tissue is not None, cohort.id
+        assert "lesional" in cohort.tissue["classes"], cohort.id
+
+
+def test_tissue_filters_out_follow_up_and_unknown_values():
+    meta = pd.DataFrame(
+        {
+            "ch1:subytpe": ["Lesional", "Nonlesional", "Perilesional", "Lesional", "Other"],
+            "ch1:timepoint": ["Baseline", "Baseline", "Baseline", "Week12", "Baseline"],
+        },
+        index=list("abcde"),
+    )
+    rules = next(c.tissue for c in load_cohorts() if c.id == "GSE189266")
+    assert tissue_labels(meta, rules).to_dict() == {
+        "a": "lesional",
+        "b": "nonlesional",
+        "c": "perilesional",
+    }

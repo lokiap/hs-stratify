@@ -12,7 +12,16 @@ def test_loco_on_synthetic_signal():
     X[:, 0] += 2.0 * y  # un gène porte le signal
     cohorts = np.repeat(["A", "B", "C"], n // 3)
 
-    results = evaluate_loco(X, y, cohorts, lambda: baseline_model(C=1.0))
+    results = evaluate_loco(X, y, cohorts, lambda: baseline_model(C=1.0, n_genes=None))
 
     assert list(results["cohort"]) == ["A", "B", "C"]
     assert (results["auroc"] > 0.7).all()
+
+
+def test_top_variance_genes_uses_training_data_only():
+    from hs_stratify.models import TopVarianceGenes
+
+    X_train = np.array([[0.0, 1.0, 5.0], [0.0, 3.0, -5.0]])
+    selector = TopVarianceGenes(k=2).fit(X_train)
+    assert selector.selected_.tolist() == [1, 2]
+    assert selector.transform(np.ones((4, 3))).shape == (4, 2)

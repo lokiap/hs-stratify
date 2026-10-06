@@ -59,3 +59,13 @@ def standardize_per_cohort(matrices: dict[str, pd.DataFrame]) -> pd.DataFrame:
         )
         blocks.append(block)
     return pd.concat(blocks)
+
+
+def standardize_per_sample(matrix: pd.DataFrame) -> pd.DataFrame:
+    """Centre-réduit chaque échantillon sur l'ensemble de ses gènes.
+
+    Contrairement à la standardisation par cohorte, le résultat ne dépend pas des autres
+    échantillons : une cohorte qui ne contient que des lésions garde son signal.
+    """
+    std = matrix.std(axis=1, ddof=0).replace(0, 1.0)
+    return matrix.sub(matrix.mean(axis=1), axis=0).div(std, axis=0)

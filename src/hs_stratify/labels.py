@@ -1,8 +1,12 @@
-"""Extraction de la réponse au traitement à partir des métadonnées GEO."""
+"""Extraction des étiquettes (réponse au traitement, type de tissu) à partir des métadonnées GEO."""
 
 from __future__ import annotations
 
+import re
+
 import pandas as pd
+
+TISSUE_CLASSES = {"lesional", "perilesional", "nonlesional", "healthy"}
 
 
 def _normalize(values: pd.Series) -> pd.Series:
@@ -80,3 +84,37 @@ def hiscr_labels(meta: pd.DataFrame, rules: dict) -> pd.Series:
 def cohort_labels(meta: pd.DataFrame, rules: dict) -> pd.Series:
     """Choisit la bonne méthode selon les règles de la cohorte."""
     return hiscr_labels(meta, rules) if "hiscr" in rules else response_labels(meta, rules)
+
+
+def tissue_labels(meta: pd.DataFrame, rules: dict) -> pd.Series:
+    """Renvoie le type de tissu de chaque échantillon retenu.
+
+    `filters` : {champ: expression régulière} que la valeur doit respecter (visite initiale...).
+    `field` et `classes` : {classe: expression régulière}, la première qui correspond gagne.
+    Les expressions ignorent la casse et doivent couvrir toute la valeur.
+    Les échantillons sans classe (sang, visite de suivi...) sont écartés.
+    """
+    keep = pd.Series(True, index=meta.index)
+    for field, pattern in rules.get("filters", {}).items():
+        if field not in meta.columns:
+            raise KeyError(f"Champ de filtre absent des métadonnées : {field}")
+        regex = re.compile(pattern, re.IGNORECASE)
+        keep &= meta[field].map(
+            lambda v, r=regex: isinstance(v, str) and bool(r.fullmatch(v.strip()))
+        )
+
+    field = rules["field"]
+    if field not in meta.columns:
+        raise KeyError(f"Champ de tissu absent des métadonnées : {field}")
+    patterns = []
+    for name, pattern in rules["classes"].items():
+        if name not in TISSUE_CLASSES:
+            raise ValueError(f"Classe de tissu inconnue : {name}")
+        patterns.append((name, re.compile(pattern, re.IGNORECASE)))
+
+    def classify(value):
+        if not isinstance(value, str):
+            return None
+        return next((name for name, r in patterns if r.fullmatch(value.strip())), None)
+
+    return meta.loc[keep, field].map(classify).dropna().rename("tissue")

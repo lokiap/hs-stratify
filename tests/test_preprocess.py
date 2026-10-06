@@ -52,3 +52,12 @@ def test_probes_to_genes_averages_probes():
     mapping = pd.Series({"p1": "TNF", "p2": "TNF"})
     result = probes_to_genes(values, mapping)
     assert result.to_dict() == {"S1": {"TNF": 3.0}}
+
+
+def test_standardize_per_sample_is_independent_of_other_samples():
+    from hs_stratify.preprocess import standardize_per_sample
+
+    matrix = pd.DataFrame([[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]], columns=list("abc"))
+    result = standardize_per_sample(matrix)
+    np.testing.assert_allclose(result.iloc[0], result.iloc[1])
+    np.testing.assert_allclose(result.mean(axis=1), 0.0, atol=1e-12)
