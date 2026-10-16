@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. Cohort registry, GEO data loading and the evaluation protocol are in place; models and results are not there yet.
+> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with a first result (lesional vs non-lesional skin). Molecular subtypes and treatment response come next.
 
 ## English
 
@@ -38,6 +38,28 @@ Two normalisations are compared:
 ```bash
 hs-stratify evaluate lesional   # AUROC per held-out cohort, written to results/lesional_loco.csv
 ```
+
+**Results** (AUROC on each held-out cohort, 11,585 genes shared by the 9 cohorts):
+
+| Held-out cohort | Technology | Samples (lesional) | Per sample | Per cohort |
+|---|---|---|---|---|
+| GSE154773 | RNA-seq | 32 (22) | 0.968 | 0.932 |
+| GSE155176 | RNA-seq | 55 (26) | 1.000 | 1.000 |
+| GSE189266 | RNA-seq | 18 (9) | 0.963 | 0.963 |
+| GSE213761 | RNA-seq | 30 (15) | 0.862 | 0.853 |
+| GSE249027 | RNA-seq | 27 (14) | 1.000 | 1.000 |
+| GSE72702 | microarray | 30 (17) | 0.977 | 0.973 |
+| GSE148027 | microarray | 22 (10) | 1.000 | 1.000 |
+| GSE128637 | microarray | 21 (10) | 1.000 | 1.000 |
+| **Mean** | | | **0.971** | **0.965** |
+
+GSE151243 contains only lesions once perilesional skin is left out, so it is used for training but cannot be scored on its own.
+
+What this shows:
+- **The signal transfers across studies and technologies:** a model trained mostly on RNA-seq scores 0.97 to 1.00 on the three microarray cohorts it has never seen.
+- **The two normalisations are close** (0.971 against 0.965). The gap is too small, with 8 cohorts, to claim one is better.
+- **GSE213761 is the hardest cohort** (0.86). Its non-lesional biopsies come from patients with moderate to severe disease (Hurley II and III), whose "healthy-looking" skin may already carry inflammation.
+- **This is a sanity check, not the end goal:** lesional skin is very different from non-lesional skin. The real question, predicting treatment response, is much harder and has far less data.
 
 ### Layout
 
@@ -100,6 +122,28 @@ Deux normalisations sont comparées :
 ```bash
 hs-stratify evaluate lesional   # AUROC par cohorte laissée de côté, écrite dans results/lesional_loco.csv
 ```
+
+**Résultats** (AUROC sur chaque cohorte laissée de côté, 11 585 gènes communs aux 9 cohortes) :
+
+| Cohorte testée | Technologie | Échantillons (lésions) | Par échantillon | Par cohorte |
+|---|---|---|---|---|
+| GSE154773 | RNA-seq | 32 (22) | 0,968 | 0,932 |
+| GSE155176 | RNA-seq | 55 (26) | 1,000 | 1,000 |
+| GSE189266 | RNA-seq | 18 (9) | 0,963 | 0,963 |
+| GSE213761 | RNA-seq | 30 (15) | 0,862 | 0,853 |
+| GSE249027 | RNA-seq | 27 (14) | 1,000 | 1,000 |
+| GSE72702 | puce | 30 (17) | 0,977 | 0,973 |
+| GSE148027 | puce | 22 (10) | 1,000 | 1,000 |
+| GSE128637 | puce | 21 (10) | 1,000 | 1,000 |
+| **Moyenne** | | | **0,971** | **0,965** |
+
+GSE151243 ne contient que des lésions une fois la peau péri-lésionnelle écartée : elle sert à l'entraînement mais ne peut pas être évaluée seule.
+
+Ce que ça montre :
+- **Le signal se transfère d'une étude et d'une technologie à l'autre :** un modèle entraîné surtout sur du RNA-seq obtient de 0,97 à 1,00 sur les trois cohortes de puces qu'il n'a jamais vues.
+- **Les deux normalisations sont proches** (0,971 contre 0,965). Avec 8 cohortes, l'écart est trop faible pour affirmer que l'une est meilleure.
+- **GSE213761 est la cohorte la plus difficile** (0,86). Ses biopsies non lésionnelles viennent de patients à un stade modéré ou sévère (Hurley II et III), dont la peau d'apparence saine porte peut-être déjà de l'inflammation.
+- **C'est un contrôle de cohérence, pas l'objectif final :** une peau lésionnelle est très différente d'une peau non lésionnelle. La vraie question, prédire la réponse au traitement, est bien plus difficile et dispose de beaucoup moins de données.
 
 ### Démarrer
 
