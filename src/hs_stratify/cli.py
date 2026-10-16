@@ -60,14 +60,14 @@ def main(argv: list[str] | None = None) -> None:
                 n_pos = int(labels.sum())
                 print(f"  réponse : {n_pos} répondeurs, {len(labels) - n_pos} non-répondeurs")
     elif args.command == "evaluate":
-        data = {
-            c.id: load_processed(c.id, PROCESSED_DIR)
-            for c in cohorts
-            if (PROCESSED_DIR / f"{c.id}_expression.csv.gz").exists()
-        }
+        data = {}
+        for c in cohorts:
+            if (PROCESSED_DIR / f"{c.id}_expression.csv.gz").exists():
+                print(f"Chargement de {c.id}...", flush=True)
+                data[c.id] = load_processed(c.id, PROCESSED_DIR)
         if not data:
             parser.error("aucune donnée construite : lancer d'abord `hs-stratify build`")
-        results = run_lesional(data, cohorts)
+        results = run_lesional(data, cohorts, log=lambda m: print(m, flush=True))
         RESULTS_DIR.mkdir(exist_ok=True)
         results.to_csv(RESULTS_DIR / "lesional_loco.csv", index=False)
         with pd.option_context("display.width", 120):

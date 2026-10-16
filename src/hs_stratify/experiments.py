@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -60,13 +61,16 @@ def run_lesional(
     data: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
     cohorts: list[Cohort],
     normalizations: tuple[str, ...] = ("sample", "cohort"),
+    log: Callable[[str], None] | None = None,
 ) -> pd.DataFrame:
     """AUROC lésion / non-lésion sur chaque cohorte laissée de côté, pour chaque normalisation."""
     tables = []
     for normalization in normalizations:
         X, y = lesional_dataset(data, cohorts, normalization)
+        if log:
+            log(f"Normalisation {normalization} : {X.shape[0]} échantillons x {X.shape[1]} gènes")
         groups = X.index.get_level_values("cohort")
-        table = evaluate_loco(X.to_numpy(), y.to_numpy(), groups, baseline_model)
+        table = evaluate_loco(X.to_numpy(), y.to_numpy(), groups, baseline_model, log=log)
         counts = y.groupby(level="cohort").agg(n_lesional="sum", n_total="size")
         table = table.join(counts, on="cohort")
         table.insert(0, "normalization", normalization)

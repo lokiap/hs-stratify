@@ -17,10 +17,14 @@ def evaluate_loco(
     y: np.ndarray,
     cohorts: Sequence[str],
     make_model: Callable[[], ClassifierMixin],
+    log: Callable[[str], None] | None = None,
 ) -> pd.DataFrame:
     """Entraîne sur toutes les cohortes sauf une et mesure l'AUROC sur celle laissée de côté."""
     rows = []
-    for held_out, train, test in leave_one_cohort_out(cohorts):
+    folds = list(leave_one_cohort_out(cohorts))
+    for i, (held_out, train, test) in enumerate(folds, start=1):
+        if log:
+            log(f"  [{i}/{len(folds)}] test sur {held_out} ({len(test)} échantillons)")
         y_test = y[test]
         if len(np.unique(y_test)) < 2:
             rows.append({"cohort": held_out, "n_test": len(test), "auroc": np.nan})
