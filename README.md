@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. The repository structure, cohort registry and evaluation protocol are in place; data loading and models are not yet implemented.
+> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with a first result (lesional vs non-lesional skin). Molecular subtypes and treatment response come next.
 
 ## English
 
@@ -14,7 +14,11 @@ Hidradenitis suppurativa (HS, also called Verneuil's disease) is a chronic infla
 
 ### Data
 
-Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](configs/cohorts.yaml). The list follows the reference study [*Classification of skin transcriptome reveals two molecular subtypes in hidradenitis suppurativa* (bioRxiv, 2025)](https://www.biorxiv.org/content/10.1101/2025.02.03.636243): 6 discovery cohorts (100 lesional samples) and 3 validation cohorts. Which cohorts carry treatment-response labels is still to be checked.
+Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](configs/cohorts.yaml). The list follows the reference study [*Classification of skin transcriptome reveals two molecular subtypes in hidradenitis suppurativa* (bioRxiv, 2025)](https://www.biorxiv.org/content/10.1101/2025.02.03.636243): 6 discovery cohorts (RNA-seq, 100 lesional samples) and 3 validation cohorts (microarrays). Two cohorts carry treatment response: GSE155176 gives it directly (anti-TNF, baseline lesional biopsies), and for GSE213761 (adalimumab) it is recomputed as HiSCR from abscess, nodule and fistula counts between visits V1 and V12.
+
+- **RNA-seq:** raw counts recomputed by NCBI on GRCh38, the same pipeline for every study, fetched from the GEO FTP (the website's download page can answer a script with a reCAPTCHA), then log2(CPM + 1) with the reference study's filter (CPM ≥ 1 in ≥ 20% of samples).
+- **Microarrays:** values from the GEO series matrix, probes mapped to genes with the GPL annotation and averaged per gene.
+- **Sample metadata** (tissue, response, timepoint) comes from the series matrix of each cohort.
 
 ### Evaluation protocol
 
@@ -23,13 +27,50 @@ Public GEO series of HS lesional skin, listed in [`configs/cohorts.yaml`](config
 - **Baseline:** elastic-net logistic regression, compared later with richer models.
 - **Metric:** AUROC per held-out cohort, reported cohort by cohort, not only averaged.
 
+### First experiment: lesional vs non-lesional skin
+
+Before predicting treatment response (only 26 labelled patients across two cohorts), the project checks that a model can tell **lesional** skin from **non-lesional or healthy** skin in a cohort it has never seen, including across technologies (RNA-seq to microarrays). Tissue labels come from each cohort's metadata (rules in `configs/cohorts.yaml`), using pre-treatment biopsies only; perilesional skin is left out.
+
+Two normalisations are compared:
+- **per cohort:** each gene centred and scaled within its cohort. This removes study effects, but also the lesion signal of a cohort made almost only of lesions;
+- **per sample:** each sample centred and scaled over its own genes, independent of the other samples.
+
+```bash
+hs-stratify evaluate lesional   # AUROC per held-out cohort, written to results/lesional_loco.csv
+```
+
+**Results** (AUROC on each held-out cohort, 11,585 genes shared by the 9 cohorts):
+
+| Held-out cohort | Technology | Samples (lesional) | Per sample | Per cohort |
+|---|---|---|---|---|
+| GSE154773 | RNA-seq | 32 (22) | 0.968 | 0.932 |
+| GSE155176 | RNA-seq | 55 (26) | 1.000 | 1.000 |
+| GSE189266 | RNA-seq | 18 (9) | 0.963 | 0.963 |
+| GSE213761 | RNA-seq | 30 (15) | 0.862 | 0.853 |
+| GSE249027 | RNA-seq | 27 (14) | 1.000 | 1.000 |
+| GSE72702 | microarray | 30 (17) | 0.977 | 0.973 |
+| GSE148027 | microarray | 22 (10) | 1.000 | 1.000 |
+| GSE128637 | microarray | 21 (10) | 1.000 | 1.000 |
+| **Mean** | | | **0.971** | **0.965** |
+
+GSE151243 contains only lesions once perilesional skin is left out, so it is used for training but cannot be scored on its own.
+
+What this shows:
+- **The signal transfers across studies and technologies:** a model trained mostly on RNA-seq scores 0.97 to 1.00 on the three microarray cohorts it has never seen.
+- **The two normalisations are close** (0.971 against 0.965). The gap is too small, with 8 cohorts, to claim one is better.
+- **GSE213761 is the hardest cohort** (0.86). Its non-lesional biopsies come from patients with moderate to severe disease (Hurley II and III), whose "healthy-looking" skin may already carry inflammation.
+- **This is a sanity check, not the end goal:** lesional skin is very different from non-lesional skin. The real question, predicting treatment response, is much harder and has far less data.
+
 ### Layout
 
 ```
 configs/cohorts.yaml     GEO cohorts and their role
 src/hs_stratify/
   cohorts.py             cohort registry
-  data.py                GEO download (GEOparse)
+  geo.py                 GEO URLs and file parsers
+  data.py                builds one cohort's expression matrix
+  labels.py              tissue and treatment response labels (field or HiSCR)
+  experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
   models.py              baseline model
@@ -42,10 +83,11 @@ notebooks/               exploration
 ### Getting started
 
 ```bash
-pip install -e ".[dev,data]"
+pip install -e ".[dev]"
 pytest
 hs-stratify cohorts          # list configured cohorts
-hs-stratify download         # download all cohorts from GEO into data/raw
+hs-stratify inspect GSE155176  # show a cohort's metadata fields
+hs-stratify build            # download from GEO and write data/processed/
 ```
 
 ## Français
@@ -56,7 +98,11 @@ La maladie de Verneuil (hidradenitis suppurativa, HS) est une maladie inflammato
 
 ### Données
 
-Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.yaml`](configs/cohorts.yaml). La liste reprend l'étude de référence ([bioRxiv, 2025](https://www.biorxiv.org/content/10.1101/2025.02.03.636243)) : 6 cohortes de découverte (100 biopsies) et 3 cohortes de validation. Il reste à vérifier lesquelles contiennent la réponse au traitement.
+Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.yaml`](configs/cohorts.yaml). La liste reprend l'étude de référence ([bioRxiv, 2025](https://www.biorxiv.org/content/10.1101/2025.02.03.636243)) : 6 cohortes de découverte (RNA-seq, 100 biopsies) et 3 cohortes de validation (puces). Deux cohortes contiennent la réponse au traitement : GSE155176 la donne directement (anti-TNF, biopsies de lésion avant traitement), et pour GSE213761 (adalimumab) elle est recalculée selon le critère HiSCR à partir des comptes d'abcès, de nodules et de fistules entre les visites V1 et V12.
+
+- **RNA-seq :** comptages recalculés par NCBI sur GRCh38, le même traitement pour toutes les études, récupérés sur le FTP de GEO (la page de téléchargement du site web peut renvoyer un reCAPTCHA à un script), puis log2(CPM + 1) avec le filtre de l'étude de référence (CPM ≥ 1 dans au moins 20 % des échantillons).
+- **Puces :** valeurs du series matrix GEO, sondes rattachées aux gènes via l'annotation GPL et moyennées par gène.
+- **Métadonnées des échantillons** (tissu, réponse, temps) : lues dans le series matrix de chaque cohorte.
 
 ### Protocole d'évaluation
 
@@ -65,13 +111,48 @@ Des séries GEO publiques de peau lésionnelle, listées dans [`configs/cohorts.
 - **Baseline :** régression logistique elastic net, comparée ensuite à des modèles plus riches.
 - **Métrique :** AUROC par cohorte testée, rapportée cohorte par cohorte et pas seulement en moyenne.
 
+### Première expérience : peau lésionnelle ou non
+
+Avant de prédire la réponse au traitement (26 patients étiquetés seulement, sur deux cohortes), le projet vérifie qu'un modèle sait distinguer une peau **lésionnelle** d'une peau **non lésionnelle ou saine** dans une cohorte qu'il n'a jamais vue, y compris en changeant de technologie (du RNA-seq aux puces). Le type de tissu vient des métadonnées de chaque cohorte (règles dans `configs/cohorts.yaml`), sur les biopsies avant traitement uniquement ; la peau péri-lésionnelle est écartée.
+
+Deux normalisations sont comparées :
+- **par cohorte :** chaque gène est centré-réduit au sein de sa cohorte. Cela retire les effets d'étude, mais aussi le signal de lésion d'une cohorte composée presque uniquement de lésions ;
+- **par échantillon :** chaque échantillon est centré-réduit sur ses propres gènes, sans dépendre des autres échantillons.
+
+```bash
+hs-stratify evaluate lesional   # AUROC par cohorte laissée de côté, écrite dans results/lesional_loco.csv
+```
+
+**Résultats** (AUROC sur chaque cohorte laissée de côté, 11 585 gènes communs aux 9 cohortes) :
+
+| Cohorte testée | Technologie | Échantillons (lésions) | Par échantillon | Par cohorte |
+|---|---|---|---|---|
+| GSE154773 | RNA-seq | 32 (22) | 0,968 | 0,932 |
+| GSE155176 | RNA-seq | 55 (26) | 1,000 | 1,000 |
+| GSE189266 | RNA-seq | 18 (9) | 0,963 | 0,963 |
+| GSE213761 | RNA-seq | 30 (15) | 0,862 | 0,853 |
+| GSE249027 | RNA-seq | 27 (14) | 1,000 | 1,000 |
+| GSE72702 | puce | 30 (17) | 0,977 | 0,973 |
+| GSE148027 | puce | 22 (10) | 1,000 | 1,000 |
+| GSE128637 | puce | 21 (10) | 1,000 | 1,000 |
+| **Moyenne** | | | **0,971** | **0,965** |
+
+GSE151243 ne contient que des lésions une fois la peau péri-lésionnelle écartée : elle sert à l'entraînement mais ne peut pas être évaluée seule.
+
+Ce que ça montre :
+- **Le signal se transfère d'une étude et d'une technologie à l'autre :** un modèle entraîné surtout sur du RNA-seq obtient de 0,97 à 1,00 sur les trois cohortes de puces qu'il n'a jamais vues.
+- **Les deux normalisations sont proches** (0,971 contre 0,965). Avec 8 cohortes, l'écart est trop faible pour affirmer que l'une est meilleure.
+- **GSE213761 est la cohorte la plus difficile** (0,86). Ses biopsies non lésionnelles viennent de patients à un stade modéré ou sévère (Hurley II et III), dont la peau d'apparence saine porte peut-être déjà de l'inflammation.
+- **C'est un contrôle de cohérence, pas l'objectif final :** une peau lésionnelle est très différente d'une peau non lésionnelle. La vraie question, prédire la réponse au traitement, est bien plus difficile et dispose de beaucoup moins de données.
+
 ### Démarrer
 
 ```bash
-pip install -e ".[dev,data]"
+pip install -e ".[dev]"
 pytest
 hs-stratify cohorts          # lister les cohortes configurées
-hs-stratify download         # télécharger les cohortes depuis GEO dans data/raw
+hs-stratify inspect GSE155176  # afficher les champs de métadonnées d'une cohorte
+hs-stratify build            # télécharger depuis GEO et écrire data/processed/
 ```
 
 ## License

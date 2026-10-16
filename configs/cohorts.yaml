@@ -1,37 +1,143 @@
 # Cohortes GEO de biopsies de peau (maladie de Verneuil / hidradenitis suppurativa).
-# Liste reprise de l'étude de référence : bioRxiv 10.1101/2025.02.03.636243.
+# Liste, plateformes et étiquettes de réponse reprises de l'étude de référence :
+# bioRxiv 10.1101/2025.02.03.636243.
 #
 # role :
 #   discovery  -> cohortes servant à construire les sous-types et entraîner les modèles
 #   validation -> cohortes jamais vues pendant l'entraînement
+# platform :
+#   rnaseq -> comptages recalculés par NCBI (GRCh38)
+#   array  -> valeurs du series matrix, annotées via la plateforme GPL
 # response_labels :
-#   unknown -> à vérifier dans les métadonnées GEO (réponse à l'adalimumab disponible ?)
+#   anti_tnf -> réponse à un anti-TNF (adalimumab d'après l'étude de référence)
+#   none     -> pas d'étiquette de réponse
+# labels (facultatif) : comment lire la réponse dans les métadonnées GEO.
+#   filters  -> on ne garde que les échantillons dont les champs prennent ces valeurs
+#   hiscr    -> à la place de response : HiSCR recalculé à partir des comptes de lésions
+#   response -> champ de réponse, valeurs comptées comme répondeur (positive) ou non (negative) ;
+#               toute autre valeur (NA, Partial, Unknown...) est écartée.
+#   Les comparaisons ignorent la casse. Champs visibles avec `hs-stratify inspect <GSE>`.
+# tissue : comment lire le type de tissu, en ne gardant que les biopsies avant traitement.
+#   filters -> {champ: expression régulière} que la valeur doit respecter entièrement
+#   field   -> champ qui porte le tissu
+#   classes -> lesional, perilesional, nonlesional ou healthy : {classe: expression régulière}
 
 cohorts:
   - id: GSE151243
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    tissue:
+      field: "ch1:tissue_type"
+      classes:
+        lesional: "lesion"
+        perilesional: "perilesion"
   - id: GSE154773
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    tissue:
+      # Hypothèse : la peau des patients (HS) est une biopsie de lésion, la série ne le précise
+      # pas. Les échantillons de sang sont écartés.
+      filters:
+        "source_name_ch1": "skin"
+      field: "ch1:condition"
+      classes:
+        lesional: "hs"
+        healthy: "control"
   - id: GSE155176
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    response_labels: anti_tnf
+    labels:
+      # Biopsies de lésion prélevées avant le début de l'anti-TNF.
+      filters:
+        "ch1:tissue type": [Lesional]
+        "ch1:treatment category": [PRE-TNF-alpha inhibitor]
+      response:
+        field: "ch1:response"
+        positive: ["yes"]
+        negative: ["no"]
+    tissue:
+      # Les biopsies prises sous anti-TNF (ON) sont écartées.
+      filters:
+        "ch1:treatment category": "pre-tnf-alpha inhibitor|tnf-alpha inhibitor naive|normal skin"
+      field: "ch1:tissue type"
+      classes:
+        lesional: "lesional"
+        nonlesional: "non-lesional"
+        healthy: "normal skin"
   - id: GSE189266
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    tissue:
+      filters:
+        "ch1:timepoint": "baseline"
+      field: "ch1:subytpe"
+      classes:
+        lesional: "lesional"
+        perilesional: "perilesional"
+        nonlesional: "nonlesional"
   - id: GSE213761
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    response_labels: anti_tnf
+    labels:
+      # Pas de colonne de réponse : HiSCR recalculé à partir des comptes de lésions
+      # entre la visite initiale (V1) et la visite V12, sous adalimumab.
+      filters:
+        "ch1:site": [LS]
+        "ch1:visit": [V1]
+      hiscr:
+        subject: "ch1:subject"
+        visit: "ch1:visit"
+        baseline: V1
+        followup: V12
+        abscess: "ch1:abcess count"
+        nodule: "ch1:node count"
+        fistula: "ch1:fistula count"
+        min_baseline_an: 3
+    tissue:
+      filters:
+        "ch1:visit": "v1"
+      field: "ch1:site"
+      classes:
+        lesional: "ls"
+        nonlesional: "nl"
   - id: GSE249027
     role: discovery
-    response_labels: unknown
+    platform: rnaseq
+    tissue:
+      field: "ch1:tissue type"
+      classes:
+        lesional: "lesional"
+        nonlesional: "non-lesional"
   - id: GSE72702
     role: validation
-    response_labels: unknown
+    platform: array
+    tissue:
+      filters:
+        "ch1:visit": "baseline"
+      field: "ch1:skin"
+      classes:
+        lesional: "lesion"
+        nonlesional: "non-lesion"
   - id: GSE148027
     role: validation
-    response_labels: unknown
+    platform: array
+    tissue:
+      # Le tissu est dans le titre ; on ne garde que la première visite (V1) de chaque personne.
+      filters:
+        "ch1:patient": ".*:v1"
+      field: "title"
+      classes:
+        lesional: "lesional.*"
+        nonlesional: "non-lesional.*"
+        healthy: "healthy.*"
   - id: GSE128637
     role: validation
-    response_labels: unknown
+    platform: array
+    tissue:
+      # Hypothèse : les biopsies de patients sont des lésions, la série ne le précise pas.
+      field: "ch1:disease state"
+      classes:
+        lesional: "hidradenitis suppurativa"
+        healthy: "normal"
