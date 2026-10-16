@@ -61,6 +61,20 @@ What this shows:
 - **GSE213761 is the hardest cohort** (0.86). Its non-lesional biopsies come from patients with moderate to severe disease (Hurley II and III), whose "healthy-looking" skin may already carry inflammation.
 - **This is a sanity check, not the end goal:** lesional skin is very different from non-lesional skin. The real question, predicting treatment response, is much harder and has far less data.
 
+### Next: molecular subtypes
+
+Lesional biopsies only (pre-treatment), centred within each cohort to remove study effects, on the 2,000 most variable genes:
+
+1. **Consensus clustering** (Monti et al., 2003): k-means on 100 random subsets of 80% of the lesions, for k = 2 to 5. The PAC score (share of ambiguous pairs) picks k: close to 0 means clear-cut groups.
+2. **Stability across cohorts:** for each cohort, subtypes are learnt without it, then its lesions are assigned to the nearest subtype. The adjusted Rand index (ARI) against the subtypes found on all data says whether they are reproducible (1 = identical, 0 = chance).
+3. **Link with treatment response** on the 26 labelled patients (Fisher's exact test when k = 2), as an exploratory result.
+
+On pure noise, this pipeline gives a PAC close to 1 and an ARI close to 0, so a high ARI on real data is not an artefact of the method.
+
+```bash
+hs-stratify evaluate subtypes   # tables written to results/subtypes_*.csv
+```
+
 ### Layout
 
 ```
@@ -70,6 +84,7 @@ src/hs_stratify/
   geo.py                 GEO URLs and file parsers
   data.py                builds one cohort's expression matrix
   labels.py              tissue and treatment response labels (field or HiSCR)
+  subtypes.py            consensus clustering and cross-cohort stability
   experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
@@ -144,6 +159,20 @@ Ce que ça montre :
 - **Les deux normalisations sont proches** (0,971 contre 0,965). Avec 8 cohortes, l'écart est trop faible pour affirmer que l'une est meilleure.
 - **GSE213761 est la cohorte la plus difficile** (0,86). Ses biopsies non lésionnelles viennent de patients à un stade modéré ou sévère (Hurley II et III), dont la peau d'apparence saine porte peut-être déjà de l'inflammation.
 - **C'est un contrôle de cohérence, pas l'objectif final :** une peau lésionnelle est très différente d'une peau non lésionnelle. La vraie question, prédire la réponse au traitement, est bien plus difficile et dispose de beaucoup moins de données.
+
+### Suite : sous-types moléculaires
+
+Biopsies de lésion uniquement (avant traitement), centrées au sein de chaque cohorte pour retirer les effets d'étude, sur les 2 000 gènes les plus variables :
+
+1. **Clustering de consensus** (Monti et al., 2003) : k-means sur 100 sous-ensembles aléatoires de 80 % des lésions, pour k = 2 à 5. Le score PAC (part des paires ambiguës) choisit k : proche de 0, les groupes sont nets.
+2. **Stabilité entre cohortes :** pour chaque cohorte, les sous-types sont appris sans elle, puis ses lésions sont rattachées au sous-type le plus proche. L'indice de Rand ajusté (ARI) par rapport aux sous-types trouvés sur toutes les données dit s'ils sont reproductibles (1 = identiques, 0 = hasard).
+3. **Lien avec la réponse au traitement** sur les 26 patients étiquetés (test exact de Fisher si k = 2), à titre exploratoire.
+
+Sur du bruit pur, ce pipeline donne un PAC proche de 1 et un ARI proche de 0 : un ARI élevé sur les vraies données n'est donc pas un artefact de la méthode.
+
+```bash
+hs-stratify evaluate subtypes   # tableaux écrits dans results/subtypes_*.csv
+```
 
 ### Démarrer
 
