@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with a first result (lesional vs non-lesional skin). Molecular subtypes and treatment response come next.
+> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with two results: lesional vs non-lesional skin, and two molecular subtypes reproducible across cohorts. Treatment response prediction comes next.
 
 ## English
 
@@ -61,6 +61,29 @@ What this shows:
 - **GSE213761 is the hardest cohort** (0.86). Its non-lesional biopsies come from patients with moderate to severe disease (Hurley II and III), whose "healthy-looking" skin may already carry inflammation.
 - **This is a sanity check, not the end goal:** lesional skin is very different from non-lesional skin. The real question, predicting treatment response, is much harder and has far less data.
 
+### Second experiment: molecular subtypes
+
+Lesional biopsies only (pre-treatment), centred within each cohort to remove study effects, on the 2,000 most variable genes:
+
+1. **Consensus clustering** (Monti et al., 2003): k-means on 100 random subsets of 80% of the lesions, for k = 2 to 5. The PAC score (share of ambiguous pairs) picks k: close to 0 means clear-cut groups.
+2. **Stability across cohorts:** for each cohort, subtypes are learnt without it, then its lesions are assigned to the nearest subtype. The adjusted Rand index (ARI) against the subtypes found on all data says whether they are reproducible (1 = identical, 0 = chance).
+3. **Link with treatment response** on the 26 labelled patients (Fisher's exact test when k = 2), as an exploratory result.
+
+On pure noise, this pipeline gives a PAC close to 1 and an ARI close to 0, so a high ARI on real data is not an artefact of the method.
+
+```bash
+hs-stratify evaluate subtypes   # tables written to results/subtypes_*.csv
+```
+
+**Results** (143 pre-treatment lesions, 11,585 shared genes):
+
+- **Two subtypes** (PAC 0.23 for k = 2, against 0.47 to 0.49 for k = 3 to 5). The groups are reasonably clear but not clear-cut, which fits a gradient between two biological programmes more than two separate diseases.
+- **They are reproducible across cohorts:** learnt without a cohort, they are found again on it with a pooled ARI of 0.84 (96% agreement). Per cohort, ARI ranges from 0.56 to 1.00, microarray cohorts included. Both subtypes appear in every cohort, but part of this balance comes from centring each cohort.
+- **They match the reference study's two subtypes:**
+  - subtype 0, **immune / inflammatory**: leukocyte genes (SELL, PLAC8, IL10RA, MS4A7, HCLS1, LY96, WAS, SASH3);
+  - subtype 1, **epidermal / keratinisation**: keratinocyte differentiation genes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
+- **No link with treatment response here:** 60% responders in subtype 0 against 64% in subtype 1 (26 patients, Fisher p = 1.0). The reference study reports 62.5% against 20%. With 26 patients this test can only detect a very large effect, and response labels were defined differently (anti-TNF response field for GSE155176, HiSCR recomputed for GSE213761), so this does not refute it, but the association is not reproduced.
+
 ### Layout
 
 ```
@@ -70,6 +93,7 @@ src/hs_stratify/
   geo.py                 GEO URLs and file parsers
   data.py                builds one cohort's expression matrix
   labels.py              tissue and treatment response labels (field or HiSCR)
+  subtypes.py            consensus clustering and cross-cohort stability
   experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
@@ -144,6 +168,29 @@ Ce que ça montre :
 - **Les deux normalisations sont proches** (0,971 contre 0,965). Avec 8 cohortes, l'écart est trop faible pour affirmer que l'une est meilleure.
 - **GSE213761 est la cohorte la plus difficile** (0,86). Ses biopsies non lésionnelles viennent de patients à un stade modéré ou sévère (Hurley II et III), dont la peau d'apparence saine porte peut-être déjà de l'inflammation.
 - **C'est un contrôle de cohérence, pas l'objectif final :** une peau lésionnelle est très différente d'une peau non lésionnelle. La vraie question, prédire la réponse au traitement, est bien plus difficile et dispose de beaucoup moins de données.
+
+### Deuxième expérience : sous-types moléculaires
+
+Biopsies de lésion uniquement (avant traitement), centrées au sein de chaque cohorte pour retirer les effets d'étude, sur les 2 000 gènes les plus variables :
+
+1. **Clustering de consensus** (Monti et al., 2003) : k-means sur 100 sous-ensembles aléatoires de 80 % des lésions, pour k = 2 à 5. Le score PAC (part des paires ambiguës) choisit k : proche de 0, les groupes sont nets.
+2. **Stabilité entre cohortes :** pour chaque cohorte, les sous-types sont appris sans elle, puis ses lésions sont rattachées au sous-type le plus proche. L'indice de Rand ajusté (ARI) par rapport aux sous-types trouvés sur toutes les données dit s'ils sont reproductibles (1 = identiques, 0 = hasard).
+3. **Lien avec la réponse au traitement** sur les 26 patients étiquetés (test exact de Fisher si k = 2), à titre exploratoire.
+
+Sur du bruit pur, ce pipeline donne un PAC proche de 1 et un ARI proche de 0 : un ARI élevé sur les vraies données n'est donc pas un artefact de la méthode.
+
+```bash
+hs-stratify evaluate subtypes   # tableaux écrits dans results/subtypes_*.csv
+```
+
+**Résultats** (143 lésions avant traitement, 11 585 gènes communs) :
+
+- **Deux sous-types** (PAC de 0,23 pour k = 2, contre 0,47 à 0,49 pour k = 3 à 5). Les groupes sont assez nets sans être tranchés, ce qui évoque un gradient entre deux programmes biologiques plutôt que deux maladies distinctes.
+- **Ils sont reproductibles d'une cohorte à l'autre :** appris sans une cohorte, ils s'y retrouvent avec un ARI global de 0,84 (96 % d'accord). Par cohorte, l'ARI va de 0,56 à 1,00, cohortes de puces comprises. Les deux sous-types sont présents dans toutes les cohortes, mais ce bon équilibre vient en partie du centrage par cohorte.
+- **Ils correspondent aux deux sous-types de l'étude de référence :**
+  - sous-type 0, **immunitaire / inflammatoire** : gènes des globules blancs (SELL, PLAC8, IL10RA, MS4A7, HCLS1, LY96, WAS, SASH3) ;
+  - sous-type 1, **épidermique / kératinisation** : gènes de différenciation des kératinocytes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
+- **Pas de lien avec la réponse au traitement ici :** 60 % de répondeurs dans le sous-type 0 contre 64 % dans le sous-type 1 (26 patients, Fisher p = 1,0). L'étude de référence rapporte 62,5 % contre 20 %. Avec 26 patients, ce test ne peut détecter qu'un effet très fort, et la réponse n'est pas définie de la même façon (champ de réponse aux anti-TNF pour GSE155176, HiSCR recalculé pour GSE213761) : cela ne la contredit pas, mais l'association n'est pas reproduite.
 
 ### Démarrer
 

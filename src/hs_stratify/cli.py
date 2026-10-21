@@ -9,7 +9,13 @@ import pandas as pd
 
 from hs_stratify.cohorts import load_cohorts
 from hs_stratify.data import fetch_metadata, load_cohort
-from hs_stratify.experiments import load_processed, run_lesional, summarize
+from hs_stratify.experiments import (
+    load_processed,
+    load_response,
+    run_lesional,
+    run_subtypes,
+    summarize,
+)
 from hs_stratify.labels import cohort_labels
 
 PROCESSED_DIR = Path("data/processed")
@@ -36,7 +42,9 @@ def main(argv: list[str] | None = None) -> None:
     build = sub.add_parser("build", help="Télécharger et construire les matrices d'expression")
     build.add_argument("ids", nargs="*", help="Identifiants GSE (toutes par défaut)")
     evaluate = sub.add_parser("evaluate", help="Lancer une expérience sur les données construites")
-    evaluate.add_argument("experiment", choices=["lesional"], help="Expérience à lancer")
+    evaluate.add_argument(
+        "experiment", choices=["lesional", "subtypes"], help="Expérience à lancer"
+    )
     args = parser.parse_args(argv)
 
     cohorts = load_cohorts()
@@ -67,13 +75,29 @@ def main(argv: list[str] | None = None) -> None:
                 data[c.id] = load_processed(c.id, PROCESSED_DIR)
         if not data:
             parser.error("aucune donnée construite : lancer d'abord `hs-stratify build`")
-        results = run_lesional(data, cohorts, log=lambda m: print(m, flush=True))
+        log = lambda m: print(m, flush=True)  # noqa: E731
         RESULTS_DIR.mkdir(exist_ok=True)
-        results.to_csv(RESULTS_DIR / "lesional_loco.csv", index=False)
-        with pd.option_context("display.width", 120):
-            print(results.round(3).to_string(index=False))
-            print()
-            print(summarize(results).to_string())
+        if args.experiment == "lesional":
+            results = run_lesional(data, cohorts, log=log)
+            results.to_csv(RESULTS_DIR / "lesional_loco.csv", index=False)
+            with pd.option_context("display.width", 120):
+                print(results.round(3).to_string(index=False))
+                print()
+                print(summarize(results).to_string())
+        else:
+            responses = {
+                cid: r for cid in data if (r := load_response(cid, PROCESSED_DIR)) is not None
+            }
+            tables = run_subtypes(data, cohorts, responses, log=log)
+            for name, table in tables.items():
+                table.to_csv(RESULTS_DIR / f"subtypes_{name}.csv", index=name == "composition")
+            with pd.option_context("display.width", 120, "display.max_rows", 200):
+                for name in ["pac", "composition", "stability", "response_summary"]:
+                    print(f"\n== {name} ==")
+                    print(tables[name].to_string())
+                print("\n== markers (top 15 par sous-type) ==")
+                for subtype, genes in tables["markers"].groupby("subtype")["gene"]:
+                    print(f"  sous-type {subtype} : {', '.join(genes)}")
 
 
 if __name__ == "__main__":
