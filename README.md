@@ -112,7 +112,7 @@ hs-stratify evaluate response   # written to results/response.csv
 
 This is a sample size problem before being a model problem. By Hanley and McNeil's formula, estimating an AUROC of 0.75 to within ±0.1 takes about 40 responders and 40 non-responders, three times the patients available here, with the same response definition across studies.
 
-## Conclusions
+### Conclusions
 
 1. **Public HS transcriptomes can be pooled:** after per-sample normalisation, a model trained on some studies recognises lesional skin in a study it has never seen (mean AUROC 0.97), including from RNA-seq to microarrays.
 2. **The two molecular subtypes of the reference study are reproduced** (immune vs epidermal) and hold up across cohorts (ARI 0.84), with an independent pipeline.
@@ -255,7 +255,7 @@ hs-stratify evaluate response   # écrit dans results/response.csv
 
 C'est un problème d'effectif avant d'être un problème de modèle. D'après la formule de Hanley et McNeil, estimer une AUROC de 0,75 à ±0,1 près demande environ 40 répondeurs et 40 non-répondeurs, soit trois fois plus de patients qu'ici, avec la même définition de la réponse d'une étude à l'autre.
 
-## Conclusions
+### Conclusions
 
 1. **Les transcriptomes publics de la maladie de Verneuil peuvent être réunis :** après normalisation par échantillon, un modèle entraîné sur certaines études reconnaît la peau lésionnelle dans une étude qu'il n'a jamais vue (AUROC moyenne de 0,97), y compris en passant du RNA-seq aux puces.
 2. **Les deux sous-types moléculaires de l'étude de référence sont retrouvés** (immunitaire et épidermique) et tiennent d'une cohorte à l'autre (ARI de 0,84), avec un pipeline indépendant.
