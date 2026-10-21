@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with two results: lesional vs non-lesional skin, and two molecular subtypes reproducible across cohorts. Treatment response prediction comes next.
+> **Status:** complete. Three experiments on 9 public cohorts (435 samples): lesional skin is recognised across studies, two molecular subtypes are reproduced, and treatment response cannot be predicted from the 26 labelled patients available. See [Conclusions](#conclusions).
 
 ## English
 
@@ -99,6 +99,24 @@ The model is an L2 logistic regression on the 2,000 most variable genes of the t
 ```bash
 hs-stratify evaluate response   # written to results/response.csv
 ```
+
+**Results** (26 patients, 17,026 genes shared by the two cohorts):
+
+| Setting | Train | Test | AUROC | 95% interval | Permutation p |
+|---|---|---|---|---|---|
+| Cross-cohort | GSE155176 (9R/3NR) | GSE213761 (7R/7NR) | 0.49 | 0.16 to 0.80 | 0.54 |
+| Cross-cohort | GSE213761 (7R/7NR) | GSE155176 (9R/3NR) | 0.70 | 0.44 to 1.00 | 0.21 |
+| Pooled leave-one-out | 25 patients | each patient | 0.33 | 0.13 to 0.53 | 0.78 |
+
+**No setting beats chance.** The 0.70 in one direction is tempting, but its interval goes down to 0.44 and shuffled labels do as well one time in five. The pooled leave-one-out at 0.33 is the small-sample bias described above, not a model that gets things backwards.
+
+This is a sample size problem before being a model problem. By Hanley and McNeil's formula, estimating an AUROC of 0.75 to within ±0.1 takes about 40 responders and 40 non-responders, three times the patients available here, with the same response definition across studies.
+
+## Conclusions
+
+1. **Public HS transcriptomes can be pooled:** after per-sample normalisation, a model trained on some studies recognises lesional skin in a study it has never seen (mean AUROC 0.97), including from RNA-seq to microarrays.
+2. **The two molecular subtypes of the reference study are reproduced** (immune vs epidermal) and hold up across cohorts (ARI 0.84), with an independent pipeline.
+3. **Predicting adalimumab response is not possible with public data today:** neither the subtypes nor a transcriptome-wide model do better than chance on 26 patients, and the subtype–response link reported by the reference study is not reproduced. Answering that question needs a cohort of about 80 treated patients.
 
 ### Layout
 
@@ -224,6 +242,24 @@ Le modèle est une régression logistique L2 sur les 2 000 gènes les plus varia
 ```bash
 hs-stratify evaluate response   # écrit dans results/response.csv
 ```
+
+**Résultats** (26 patients, 17 026 gènes communs aux deux cohortes) :
+
+| Cadre | Entraînement | Test | AUROC | Intervalle à 95 % | p de permutation |
+|---|---|---|---|---|---|
+| D'une cohorte à l'autre | GSE155176 (9R/3NR) | GSE213761 (7R/7NR) | 0,49 | 0,16 à 0,80 | 0,54 |
+| D'une cohorte à l'autre | GSE213761 (7R/7NR) | GSE155176 (9R/3NR) | 0,70 | 0,44 à 1,00 | 0,21 |
+| Leave-one-out groupé | 25 patients | chaque patient | 0,33 | 0,13 à 0,53 | 0,78 |
+
+**Aucun cadre ne fait mieux que le hasard.** Le 0,70 dans un sens est tentant, mais son intervalle descend à 0,44 et des étiquettes mélangées font aussi bien une fois sur cinq. Le 0,33 du leave-one-out groupé est le biais des petits échantillons décrit plus haut, pas un modèle qui se tromperait systématiquement.
+
+C'est un problème d'effectif avant d'être un problème de modèle. D'après la formule de Hanley et McNeil, estimer une AUROC de 0,75 à ±0,1 près demande environ 40 répondeurs et 40 non-répondeurs, soit trois fois plus de patients qu'ici, avec la même définition de la réponse d'une étude à l'autre.
+
+## Conclusions
+
+1. **Les transcriptomes publics de la maladie de Verneuil peuvent être réunis :** après normalisation par échantillon, un modèle entraîné sur certaines études reconnaît la peau lésionnelle dans une étude qu'il n'a jamais vue (AUROC moyenne de 0,97), y compris en passant du RNA-seq aux puces.
+2. **Les deux sous-types moléculaires de l'étude de référence sont retrouvés** (immunitaire et épidermique) et tiennent d'une cohorte à l'autre (ARI de 0,84), avec un pipeline indépendant.
+3. **Prédire la réponse à l'adalimumab n'est pas possible aujourd'hui avec les données publiques :** ni les sous-types ni un modèle sur tout le transcriptome ne font mieux que le hasard sur 26 patients, et le lien entre sous-type et réponse rapporté par l'étude de référence n'est pas reproduit. Répondre à cette question demanderait une cohorte d'environ 80 patients traités.
 
 ### Démarrer
 
