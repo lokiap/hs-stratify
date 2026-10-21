@@ -11,7 +11,7 @@ import pandas as pd
 from hs_stratify.cohorts import Cohort
 from hs_stratify.evaluate import evaluate_loco
 from hs_stratify.labels import tissue_labels
-from hs_stratify.models import baseline_model
+from hs_stratify.models import baseline_model, ridge_model
 from hs_stratify.preprocess import common_genes, standardize_per_cohort, standardize_per_sample
 
 # Lésion contre peau sans lésion (non lésionnelle chez un patient, ou peau saine).
@@ -227,3 +227,113 @@ def run_subtypes(
         "response_summary": response_summary,
         "markers": marker_genes(X, labels.to_numpy()),
     }
+
+
+def response_dataset(
+    data: dict[str, tuple[pd.DataFrame, pd.DataFrame]], responses: dict[str, pd.Series]
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Biopsies étiquetées, gènes communs, chaque échantillon centré-réduit sur ses gènes."""
+    matrices, targets = {}, {}
+    for cohort_id, response in responses.items():
+        if cohort_id not in data:
+            continue
+        expression, _ = data[cohort_id]
+        response = response[response.index.isin(expression.index)]
+        if response.empty:
+            continue
+        matrices[cohort_id] = expression.loc[response.index]
+        targets[cohort_id] = response.astype(int)
+    genes = common_genes(matrices)
+    X = pd.concat(
+        {cid: standardize_per_sample(m[genes]) for cid, m in matrices.items()},
+        names=["cohort", "sample"],
+    )
+    y = pd.concat(targets, names=["cohort", "sample"]).loc[X.index]
+    return X, y
+
+
+def run_response(
+    data: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
+    responses: dict[str, pd.Series],
+    n_genes: int = 2000,
+    C: float = 0.1,
+    n_permutations: int = 200,
+    n_bootstrap: int = 1000,
+    n_loo_permutations: int = 50,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    """Prédiction de la réponse : d'une cohorte vers l'autre, puis en leave-one-out groupé.
+
+    Le leave-one-out mélange les deux cohortes : il est donné pour comparaison, il est
+    optimiste puisque le modèle voit des patients de la même étude que celui qu'il prédit.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    from hs_stratify.response import (
+        bootstrap_auroc_ci,
+        fit_score,
+        leave_one_out_p_value,
+        leave_one_out_scores,
+        permutation_p_value,
+    )
+
+    say = log or (lambda m: None)
+    X, y = response_dataset(data, responses)
+    say(f"{len(y)} patients étiquetés, {X.shape[1]} gènes communs")
+
+    def make_model():
+        return ridge_model(C=C, n_genes=n_genes)
+
+    def counts(mask) -> str:
+        values = y[mask]
+        return f"{int(values.sum())}R/{int((values == 0).sum())}NR"
+
+    groups = X.index.get_level_values("cohort")
+    rows = []
+    for train_id in dict.fromkeys(groups):
+        for test_id in dict.fromkeys(groups):
+            if train_id == test_id:
+                continue
+            say(f"  entraînement sur {train_id}, test sur {test_id}...")
+            train, test = groups == train_id, groups == test_id
+            X_tr, y_tr = X[train].to_numpy(), y[train].to_numpy()
+            X_te, y_te = X[test].to_numpy(), y[test].to_numpy()
+            scores = fit_score(make_model, X_tr, y_tr, X_te)
+            auroc = roc_auc_score(y_te, scores)
+            low, high = bootstrap_auroc_ci(y_te, scores, n_bootstrap)
+            p = permutation_p_value(make_model, X_tr, y_tr, X_te, y_te, auroc, n_permutations)
+            rows.append(
+                {
+                    "setting": "cross-cohort",
+                    "train": train_id,
+                    "test": test_id,
+                    "n_train": counts(train),
+                    "n_test": counts(test),
+                    "auroc": auroc,
+                    "ci_low": low,
+                    "ci_high": high,
+                    "perm_p": p,
+                }
+            )
+
+    say("  leave-one-out sur les deux cohortes réunies (optimiste)...")
+    X_all, y_all = X.to_numpy(), y.to_numpy()
+    scores = leave_one_out_scores(make_model, X_all, y_all)
+    auroc = roc_auc_score(y_all, scores)
+    low, high = bootstrap_auroc_ci(y_all, scores, n_bootstrap)
+    p = leave_one_out_p_value(make_model, X_all, y_all, auroc, n_loo_permutations)
+    everyone = np.ones(len(y), dtype=bool)
+    rows.append(
+        {
+            "setting": "pooled leave-one-out",
+            "train": "all but one",
+            "test": "each patient",
+            "n_train": counts(everyone),
+            "n_test": counts(everyone),
+            "auroc": auroc,
+            "ci_low": low,
+            "ci_high": high,
+            "perm_p": p,
+        }
+    )
+    return pd.DataFrame(rows).round(3)

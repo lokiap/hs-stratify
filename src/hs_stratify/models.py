@@ -41,3 +41,20 @@ def baseline_model(C: float = 0.1, n_genes: int | None = 2000) -> Pipeline:
         ),
     ]
     return Pipeline(steps)
+
+
+def ridge_model(C: float = 0.1, n_genes: int | None = 2000) -> Pipeline:
+    """Régression logistique L2 : bien plus rapide que l'elastic net, pour les tests répétés.
+
+    Le test de permutation réentraîne le modèle des milliers de fois sur une poignée de
+    patients ; l'elastic net (solveur saga) y est trop lent sur un portable.
+    """
+    steps = [] if n_genes is None else [("genes", TopVarianceGenes(n_genes))]
+    steps += [
+        ("scale", StandardScaler()),
+        (
+            "clf",
+            LogisticRegression(l1_ratio=0.0, C=C, class_weight="balanced", max_iter=1000),
+        ),
+    ]
+    return Pipeline(steps)

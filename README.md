@@ -4,7 +4,7 @@ Predicting adalimumab response in HS (Hidradenitis Suppurativa) from skin transc
 
 [English](#english) · [Français](#français)
 
-> **Status:** work in progress. GEO data loading and the cross-cohort protocol are in place, with two results: lesional vs non-lesional skin, and two molecular subtypes reproducible across cohorts. Treatment response prediction comes next.
+> **Status:** complete. Three experiments on 9 public cohorts (435 samples): lesional skin is recognised across studies, two molecular subtypes are reproduced, and treatment response cannot be predicted from the 26 labelled patients available. See [Conclusions](#conclusions).
 
 ## English
 
@@ -84,6 +84,40 @@ hs-stratify evaluate subtypes   # tables written to results/subtypes_*.csv
   - subtype 1, **epidermal / keratinisation**: keratinocyte differentiation genes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
 - **No link with treatment response here:** 60% responders in subtype 0 against 64% in subtype 1 (26 patients, Fisher p = 1.0). The reference study reports 62.5% against 20%. With 26 patients this test can only detect a very large effect, and response labels were defined differently (anti-TNF response field for GSE155176, HiSCR recomputed for GSE213761), so this does not refute it, but the association is not reproduced.
 
+### Third experiment: predicting treatment response
+
+Only two cohorts carry response labels: GSE155176 (9 responders, 3 non-responders) and GSE213761 (7 and 7). With so few patients a single AUROC means little, so each score comes with:
+- a **95% bootstrap interval**, resampling responders and non-responders separately;
+- a **permutation test**: the model is retrained on shuffled training labels, and the p-value is the share of shuffled runs that do as well as the real one.
+
+Settings:
+- **cross-cohort**, the honest one: train on one cohort, test on the other, in both directions;
+- **pooled leave-one-out**, for comparison: each patient is scored by a model trained on the 25 others, both cohorts mixed. On pure noise, leave-one-out AUROC sits well below 0.5 (a known bias with tiny samples), which is why the permutation p-value, not the AUROC, is the number to read.
+
+The model is an L2 logistic regression on the 2,000 most variable genes of the training set: the permutation test refits it thousands of times, which the elastic net is too slow for on a laptop. On pure noise, the cross-cohort test gave no p-value under 0.05 in 20 simulated runs.
+
+```bash
+hs-stratify evaluate response   # written to results/response.csv
+```
+
+**Results** (26 patients, 17,026 genes shared by the two cohorts):
+
+| Setting | Train | Test | AUROC | 95% interval | Permutation p |
+|---|---|---|---|---|---|
+| Cross-cohort | GSE155176 (9R/3NR) | GSE213761 (7R/7NR) | 0.49 | 0.16 to 0.80 | 0.54 |
+| Cross-cohort | GSE213761 (7R/7NR) | GSE155176 (9R/3NR) | 0.70 | 0.44 to 1.00 | 0.21 |
+| Pooled leave-one-out | 25 patients | each patient | 0.33 | 0.13 to 0.53 | 0.78 |
+
+**No setting beats chance.** The 0.70 in one direction is tempting, but its interval goes down to 0.44 and shuffled labels do as well one time in five. The pooled leave-one-out at 0.33 is the small-sample bias described above, not a model that gets things backwards.
+
+This is a sample size problem before being a model problem. By Hanley and McNeil's formula, estimating an AUROC of 0.75 to within ±0.1 takes about 40 responders and 40 non-responders, three times the patients available here, with the same response definition across studies.
+
+### Conclusions
+
+1. **Public HS transcriptomes can be pooled:** after per-sample normalisation, a model trained on some studies recognises lesional skin in a study it has never seen (mean AUROC 0.97), including from RNA-seq to microarrays.
+2. **The two molecular subtypes of the reference study are reproduced** (immune vs epidermal) and hold up across cohorts (ARI 0.84), with an independent pipeline.
+3. **Predicting adalimumab response is not possible with public data today:** neither the subtypes nor a transcriptome-wide model do better than chance on 26 patients, and the subtype–response link reported by the reference study is not reproduced. Answering that question needs a cohort of about 80 treated patients.
+
 ### Layout
 
 ```
@@ -94,6 +128,7 @@ src/hs_stratify/
   data.py                builds one cohort's expression matrix
   labels.py              tissue and treatment response labels (field or HiSCR)
   subtypes.py            consensus clustering and cross-cohort stability
+  response.py            bootstrap intervals and permutation tests for tiny samples
   experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
@@ -191,6 +226,40 @@ hs-stratify evaluate subtypes   # tableaux écrits dans results/subtypes_*.csv
   - sous-type 0, **immunitaire / inflammatoire** : gènes des globules blancs (SELL, PLAC8, IL10RA, MS4A7, HCLS1, LY96, WAS, SASH3) ;
   - sous-type 1, **épidermique / kératinisation** : gènes de différenciation des kératinocytes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
 - **Pas de lien avec la réponse au traitement ici :** 60 % de répondeurs dans le sous-type 0 contre 64 % dans le sous-type 1 (26 patients, Fisher p = 1,0). L'étude de référence rapporte 62,5 % contre 20 %. Avec 26 patients, ce test ne peut détecter qu'un effet très fort, et la réponse n'est pas définie de la même façon (champ de réponse aux anti-TNF pour GSE155176, HiSCR recalculé pour GSE213761) : cela ne la contredit pas, mais l'association n'est pas reproduite.
+
+### Troisième expérience : prédire la réponse au traitement
+
+Seules deux cohortes ont la réponse au traitement : GSE155176 (9 répondeurs, 3 non-répondeurs) et GSE213761 (7 et 7). Avec si peu de patients, une AUROC seule ne veut pas dire grand-chose : chaque score est donc accompagné
+- d'un **intervalle à 95 % par bootstrap**, en rééchantillonnant répondeurs et non-répondeurs séparément ;
+- d'un **test de permutation** : le modèle est réentraîné sur des étiquettes mélangées, et la p-value est la part de ces essais qui font aussi bien que le vrai.
+
+Deux cadres :
+- **d'une cohorte à l'autre**, le cadre honnête : entraînement sur une cohorte, test sur l'autre, dans les deux sens ;
+- **leave-one-out groupé**, pour comparaison : chaque patient est évalué par un modèle entraîné sur les 25 autres, les deux cohortes mélangées. Sur du bruit pur, l'AUROC en leave-one-out tombe nettement sous 0,5 (un biais connu sur les tout petits échantillons) : c'est donc la p-value de permutation, pas l'AUROC, qu'il faut lire.
+
+Le modèle est une régression logistique L2 sur les 2 000 gènes les plus variables de l'entraînement : le test de permutation le réentraîne des milliers de fois, ce qui serait trop lent avec l'elastic net sur un portable. Sur du bruit pur, le test d'une cohorte à l'autre n'a donné aucune p-value sous 0,05 en 20 simulations.
+
+```bash
+hs-stratify evaluate response   # écrit dans results/response.csv
+```
+
+**Résultats** (26 patients, 17 026 gènes communs aux deux cohortes) :
+
+| Cadre | Entraînement | Test | AUROC | Intervalle à 95 % | p de permutation |
+|---|---|---|---|---|---|
+| D'une cohorte à l'autre | GSE155176 (9R/3NR) | GSE213761 (7R/7NR) | 0,49 | 0,16 à 0,80 | 0,54 |
+| D'une cohorte à l'autre | GSE213761 (7R/7NR) | GSE155176 (9R/3NR) | 0,70 | 0,44 à 1,00 | 0,21 |
+| Leave-one-out groupé | 25 patients | chaque patient | 0,33 | 0,13 à 0,53 | 0,78 |
+
+**Aucun cadre ne fait mieux que le hasard.** Le 0,70 dans un sens est tentant, mais son intervalle descend à 0,44 et des étiquettes mélangées font aussi bien une fois sur cinq. Le 0,33 du leave-one-out groupé est le biais des petits échantillons décrit plus haut, pas un modèle qui se tromperait systématiquement.
+
+C'est un problème d'effectif avant d'être un problème de modèle. D'après la formule de Hanley et McNeil, estimer une AUROC de 0,75 à ±0,1 près demande environ 40 répondeurs et 40 non-répondeurs, soit trois fois plus de patients qu'ici, avec la même définition de la réponse d'une étude à l'autre.
+
+### Conclusions
+
+1. **Les transcriptomes publics de la maladie de Verneuil peuvent être réunis :** après normalisation par échantillon, un modèle entraîné sur certaines études reconnaît la peau lésionnelle dans une étude qu'il n'a jamais vue (AUROC moyenne de 0,97), y compris en passant du RNA-seq aux puces.
+2. **Les deux sous-types moléculaires de l'étude de référence sont retrouvés** (immunitaire et épidermique) et tiennent d'une cohorte à l'autre (ARI de 0,84), avec un pipeline indépendant.
+3. **Prédire la réponse à l'adalimumab n'est pas possible aujourd'hui avec les données publiques :** ni les sous-types ni un modèle sur tout le transcriptome ne font mieux que le hasard sur 26 patients, et le lien entre sous-type et réponse rapporté par l'étude de référence n'est pas reproduit. Répondre à cette question demanderait une cohorte d'environ 80 patients traités.
 
 ### Démarrer
 

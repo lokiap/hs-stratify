@@ -13,6 +13,7 @@ from hs_stratify.experiments import (
     load_processed,
     load_response,
     run_lesional,
+    run_response,
     run_subtypes,
     summarize,
 )
@@ -43,7 +44,7 @@ def main(argv: list[str] | None = None) -> None:
     build.add_argument("ids", nargs="*", help="Identifiants GSE (toutes par défaut)")
     evaluate = sub.add_parser("evaluate", help="Lancer une expérience sur les données construites")
     evaluate.add_argument(
-        "experiment", choices=["lesional", "subtypes"], help="Expérience à lancer"
+        "experiment", choices=["lesional", "subtypes", "response"], help="Expérience à lancer"
     )
     args = parser.parse_args(argv)
 
@@ -84,6 +85,14 @@ def main(argv: list[str] | None = None) -> None:
                 print(results.round(3).to_string(index=False))
                 print()
                 print(summarize(results).to_string())
+        elif args.experiment == "response":
+            responses = {
+                cid: r for cid in data if (r := load_response(cid, PROCESSED_DIR)) is not None
+            }
+            results = run_response(data, responses, log=log)
+            results.to_csv(RESULTS_DIR / "response.csv", index=False)
+            with pd.option_context("display.width", 140):
+                print(results.to_string(index=False))
         else:
             responses = {
                 cid: r for cid in data if (r := load_response(cid, PROCESSED_DIR)) is not None
