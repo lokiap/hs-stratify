@@ -84,6 +84,22 @@ hs-stratify evaluate subtypes   # tables written to results/subtypes_*.csv
   - subtype 1, **epidermal / keratinisation**: keratinocyte differentiation genes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
 - **No link with treatment response here:** 60% responders in subtype 0 against 64% in subtype 1 (26 patients, Fisher p = 1.0). The reference study reports 62.5% against 20%. With 26 patients this test can only detect a very large effect, and response labels were defined differently (anti-TNF response field for GSE155176, HiSCR recomputed for GSE213761), so this does not refute it, but the association is not reproduced.
 
+### Third experiment: predicting treatment response
+
+Only two cohorts carry response labels: GSE155176 (9 responders, 3 non-responders) and GSE213761 (7 and 7). With so few patients a single AUROC means little, so each score comes with:
+- a **95% bootstrap interval**, resampling responders and non-responders separately;
+- a **permutation test**: the model is retrained on shuffled training labels, and the p-value is the share of shuffled runs that do as well as the real one.
+
+Settings:
+- **cross-cohort**, the honest one: train on one cohort, test on the other, in both directions;
+- **pooled leave-one-out**, for comparison: each patient is scored by a model trained on the 25 others, both cohorts mixed. On pure noise, leave-one-out AUROC sits well below 0.5 (a known bias with tiny samples), which is why the permutation p-value, not the AUROC, is the number to read.
+
+The model is an L2 logistic regression on the 2,000 most variable genes of the training set: the permutation test refits it thousands of times, which the elastic net is too slow for on a laptop. On pure noise, the cross-cohort test gave no p-value under 0.05 in 20 simulated runs.
+
+```bash
+hs-stratify evaluate response   # written to results/response.csv
+```
+
 ### Layout
 
 ```
@@ -94,6 +110,7 @@ src/hs_stratify/
   data.py                builds one cohort's expression matrix
   labels.py              tissue and treatment response labels (field or HiSCR)
   subtypes.py            consensus clustering and cross-cohort stability
+  response.py            bootstrap intervals and permutation tests for tiny samples
   experiments.py         reproducible experiments
   preprocess.py          gene intersection and per-cohort standardisation
   splits.py              leave-one-cohort-out splits
@@ -191,6 +208,22 @@ hs-stratify evaluate subtypes   # tableaux écrits dans results/subtypes_*.csv
   - sous-type 0, **immunitaire / inflammatoire** : gènes des globules blancs (SELL, PLAC8, IL10RA, MS4A7, HCLS1, LY96, WAS, SASH3) ;
   - sous-type 1, **épidermique / kératinisation** : gènes de différenciation des kératinocytes (DLX3, PKP1, KCNK7, GGT6, POU3F1, BMP7, AHNAK2).
 - **Pas de lien avec la réponse au traitement ici :** 60 % de répondeurs dans le sous-type 0 contre 64 % dans le sous-type 1 (26 patients, Fisher p = 1,0). L'étude de référence rapporte 62,5 % contre 20 %. Avec 26 patients, ce test ne peut détecter qu'un effet très fort, et la réponse n'est pas définie de la même façon (champ de réponse aux anti-TNF pour GSE155176, HiSCR recalculé pour GSE213761) : cela ne la contredit pas, mais l'association n'est pas reproduite.
+
+### Troisième expérience : prédire la réponse au traitement
+
+Seules deux cohortes ont la réponse au traitement : GSE155176 (9 répondeurs, 3 non-répondeurs) et GSE213761 (7 et 7). Avec si peu de patients, une AUROC seule ne veut pas dire grand-chose : chaque score est donc accompagné
+- d'un **intervalle à 95 % par bootstrap**, en rééchantillonnant répondeurs et non-répondeurs séparément ;
+- d'un **test de permutation** : le modèle est réentraîné sur des étiquettes mélangées, et la p-value est la part de ces essais qui font aussi bien que le vrai.
+
+Deux cadres :
+- **d'une cohorte à l'autre**, le cadre honnête : entraînement sur une cohorte, test sur l'autre, dans les deux sens ;
+- **leave-one-out groupé**, pour comparaison : chaque patient est évalué par un modèle entraîné sur les 25 autres, les deux cohortes mélangées. Sur du bruit pur, l'AUROC en leave-one-out tombe nettement sous 0,5 (un biais connu sur les tout petits échantillons) : c'est donc la p-value de permutation, pas l'AUROC, qu'il faut lire.
+
+Le modèle est une régression logistique L2 sur les 2 000 gènes les plus variables de l'entraînement : le test de permutation le réentraîne des milliers de fois, ce qui serait trop lent avec l'elastic net sur un portable. Sur du bruit pur, le test d'une cohorte à l'autre n'a donné aucune p-value sous 0,05 en 20 simulations.
+
+```bash
+hs-stratify evaluate response   # écrit dans results/response.csv
+```
 
 ### Démarrer
 
